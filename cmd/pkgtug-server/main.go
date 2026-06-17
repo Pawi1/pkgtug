@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/pawi1/pkgtug/internal/config"
 	"github.com/pawi1/pkgtug/internal/server"
@@ -20,9 +24,24 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	srv := server.New(cfg)
+
+	log.Printf("pkgtug-server %s: initialising packages", version)
+	srv.Init(ctx)
+
 	log.Printf("pkgtug-server %s listening on %s", version, cfg.Server.Listen)
-	if err := http.ListenAndServe(cfg.Server.Listen, srv.Handler()); err != nil {
-		log.Fatalf("server: %v", err)
+	httpSrv := &http.Server{Addr: cfg.Server.Listen, Handler: srv.Handler()}
+
+	go func() {
+		<-ctx.Done()
+		log.Println("pkgtug-server: shutting down")
+		httpSrv.Shutdown(context.Background())
+	}()
+
+	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		os.Exit(1)
 	}
 }
