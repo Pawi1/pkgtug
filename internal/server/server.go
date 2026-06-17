@@ -42,7 +42,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /tug/repo/{name}/manifest.json", s.handleManifest)
 	mux.HandleFunc("GET /tug/repo/{name}/binaries/{version}/{platform}/{component}", s.handleBinaryDownload)
 	mux.HandleFunc("GET /tug/packages", s.handlePackageList)
-	// worker — requires Authorization: Bearer <worker_secret>
+	// authenticated — requires Authorization: Bearer <worker_secret>
+	mux.HandleFunc("POST /tug/repo/{name}/push", s.handlePush)
 	mux.HandleFunc("GET /tug/build/next", s.handleBuildNext)
 	mux.HandleFunc("POST /tug/build/{job_id}/result", s.handleBuildResult)
 	return mux

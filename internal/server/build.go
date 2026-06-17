@@ -110,42 +110,49 @@ func (s *Server) handleBuildResult(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) storeBuildResult(job *Job, r *http.Request) error {
-	pkgDir := filepath.Join(s.cfg.Server.DataDir, "packages", job.PackageName, job.Version, job.Platform)
-	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
-		return err
-	}
-
-	mfPath := filepath.Join(s.cfg.Server.DataDir, "packages", job.PackageName, "manifest.json")
-	mf, err := manifest.Load(mfPath)
-	if err != nil {
-		return fmt.Errorf("load manifest: %w", err)
-	}
-	mf.Version = job.Version
-
 	for _, bin := range job.Binaries {
 		fh, _, err := r.FormFile(bin.Component)
 		if err != nil {
 			return fmt.Errorf("component %q missing from upload: %w", bin.Component, err)
 		}
-		defer fh.Close()
-
-		destPath := filepath.Join(pkgDir, bin.Component)
-		if err := saveFile(fh, destPath); err != nil {
-			return fmt.Errorf("save %s: %w", bin.Component, err)
-		}
-
-		sum, err := sha256File(destPath)
-		if err != nil {
+		if err := s.storeBinary(job.PackageName, job.Version, job.Platform, bin.Component, fh); err != nil {
+			fh.Close()
 			return err
 		}
-
-		if mf.Binaries[bin.Component] == nil {
-			mf.Binaries[bin.Component] = make(map[string]manifest.Binary)
-		}
-		url := fmt.Sprintf("%s/tug/repo/%s/binaries/%s/%s/%s",
-			s.cfg.Server.BaseURL, job.PackageName, job.Version, job.Platform, bin.Component)
-		mf.Binaries[bin.Component][job.Platform] = manifest.Binary{URL: url, SHA256: sum}
+		fh.Close()
 	}
+	return nil
+}
+
+// storeBinary saves one binary file and updates the package manifest atomically.
+func (s *Server) storeBinary(pkgName, version, platform, component string, src io.Reader) error {
+	pkgDir := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName, version, platform)
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		return err
+	}
+
+	destPath := filepath.Join(pkgDir, component)
+	if err := saveFile(src, destPath); err != nil {
+		return fmt.Errorf("save %s: %w", component, err)
+	}
+
+	sum, err := sha256File(destPath)
+	if err != nil {
+		return err
+	}
+
+	mfPath := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName, "manifest.json")
+	mf, err := manifest.Load(mfPath)
+	if err != nil {
+		return fmt.Errorf("load manifest: %w", err)
+	}
+	mf.Version = version
+	if mf.Binaries[component] == nil {
+		mf.Binaries[component] = make(map[string]manifest.Binary)
+	}
+	url := fmt.Sprintf("%s/tug/repo/%s/binaries/%s/%s/%s",
+		s.cfg.Server.BaseURL, pkgName, version, platform, component)
+	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: sum}
 
 	return manifest.WriteAtomic(mfPath, mf)
 }

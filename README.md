@@ -80,10 +80,28 @@ pkgtug-server --config /etc/pkgtug/server.yaml
 | `GET /tug/repo/<name>/manifest.json` | none | Latest manifest for a package |
 | `GET /tug/repo/<name>/binaries/<ver>/<platform>/<component>` | none | Download a binary |
 | `GET /tug/packages` | none | List tracked packages and their current versions |
+| `POST /tug/repo/<name>/push` | Bearer secret | Push a pre-built binary directly (AppImage, etc.) |
 | `GET /tug/build/next?platform=<p>` | Bearer secret | Worker: claim next pending job |
 | `POST /tug/build/<job_id>/result` | Bearer secret | Worker: submit build result |
 
 Configure the webhook in your forge: `POST https://tug.example.com/tug/fetch/<name>`. No secret needed — it only runs `git fetch`.
+
+### Direct push (pre-built binaries)
+
+For AppImages, release binaries, or any artifact built outside pkgtug — push directly without a worker:
+
+```sh
+curl -X POST https://tug.example.com/tug/repo/myapp/push \
+  -H "Authorization: Bearer $WORKER_SECRET" \
+  -F "version=1.2.3" \
+  -F "platform=linux-x64" \
+  -F "component=app" \
+  -F "file=@myapp-1.2.3-x86_64.AppImage"
+```
+
+Multiple platforms: repeat the call with a different `platform` value — each push adds an entry to the manifest without overwriting others. A Telegram notification is sent on each successful push (if configured).
+
+The package must still be declared in `server.yaml` (so the server knows about it), but `build_command` and `binaries` are irrelevant for direct-push packages — they exist only to keep the config schema consistent.
 
 ## Worker
 
