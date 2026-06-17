@@ -42,6 +42,9 @@ server:
   base_url: "https://tug.example.com"
   data_dir: "/var/lib/pkgtug"
   worker_secret: "random-secret-shared-with-workers"
+  cors_origins:
+    - "*"              # required for the browser UI; restrict to your domain if preferred
+  webhook_cooldown: "10s"   # min gap between webhook fetches per package (default 10s)
 
 telegram:          # optional — leave empty to disable
   bot_token: ""
@@ -57,6 +60,7 @@ packages:
       # type: branch     # track a branch (version = short SHA)
       # name: main
     build_command: "make build"
+    poll_interval: "5m"   # optional: re-check for new versions on a schedule
     binaries:
       - component: server
         path: dist/myapp
@@ -66,16 +70,25 @@ packages:
 - `tag` — version string is the tag name matching `pattern` (e.g. `26.07.02-stable`)
 - `branch` — version string is an 8-char commit SHA; any new commit triggers a build
 
+`poll_interval` is a backup for missed webhooks. The server also clones the repository automatically on first startup if `local_clone` does not exist.
+
 ### Run
 
 ```sh
 pkgtug-server --config /etc/pkgtug/server.yaml
 ```
 
+On startup the server:
+1. Clones any repos that are not yet present on disk (`git clone`)
+2. Detects the current version for every package
+3. Restores version/build state from `data_dir/server-state.json` (survives restarts)
+4. Starts background polling goroutines for packages with `poll_interval` set
+
 ### API
 
 | Endpoint | Auth | Description |
 |----------|------|-------------|
+| `GET /healthz` | none | Server health and current version per package |
 | `POST /tug/fetch/<name>` | none | Trigger git fetch; safe to use as a native GitHub/GitLab webhook |
 | `GET /tug/repo/<name>/manifest.json` | none | Latest manifest for a package |
 | `GET /tug/repo/<name>/binaries/<ver>/<platform>/<component>` | none | Download a binary |
@@ -85,6 +98,25 @@ pkgtug-server --config /etc/pkgtug/server.yaml
 | `POST /tug/build/<job_id>/result` | Bearer secret | Worker: submit build result |
 
 Configure the webhook in your forge: `POST https://tug.example.com/tug/fetch/<name>`. No secret needed — it only runs `git fetch`.
+
+Repeated webhook calls within the cooldown window (`webhook_cooldown`, default 10 s) are rejected with `429 Too Many Requests` to protect the server from accidental flooding.
+
+### Health check
+
+```sh
+curl https://tug.example.com/healthz
+```
+
+```json
+{
+  "status": "ok",
+  "packages": {
+    "myapp": "26.07.02-stable"
+  },
+  "goos": "linux",
+  "goarch": "amd64"
+}
+```
 
 ### Direct push (pre-built binaries)
 
@@ -199,14 +231,24 @@ pkgtug check myapp/server
 # update one package
 pkgtug update myapp/server
 
-# update everything installed
+# update everything installed (skips pinned packages)
 pkgtug update --all
 
-# show installed packages (includes remote column)
+# show installed packages (remote, version, pin status)
 pkgtug status
+
+# pin a package — lock version, exclude from update --all
+pkgtug pin myapp/server
+
+# release the pin
+pkgtug pin --unpin myapp/server
 
 # restore previous binary from backup
 pkgtug rollback myapp/server
+
+# remove from state (add --remove-binary to also delete the file)
+pkgtug uninstall myapp/server
+pkgtug uninstall --remove-binary myapp/server
 ```
 
 `install` is interactive: it prompts for binary path, service name (for stop/start during updates), health check URL or command, and backup directory. All prompts except the path have defaults or can be skipped with Enter.
@@ -217,7 +259,7 @@ pkgtug rollback myapp/server
 */15 * * * * pkgtug update --all
 ```
 
-No daemon required. When stdout is not a terminal (cron, CI), all TUI output (spinner, progress bar) is automatically replaced with plain log lines.
+No daemon required. When stdout is not a terminal (cron, CI), all TUI output (spinner, progress bar) is automatically replaced with plain log lines. Pinned packages are skipped silently.
 
 ### Update flow
 
@@ -247,7 +289,7 @@ Requires Go 1.22+. Produces fully static binaries.
 
 ## Security model
 
-- The webhook endpoint has **no authentication** — it only runs `git fetch` on a local clone. Safe to expose publicly.
+- The webhook endpoint has **no authentication** — it only runs `git fetch` on a local clone. Safe to expose publicly. Repeated calls within the cooldown window are rate-limited (default 10 s).
 - Worker endpoints require `Authorization: Bearer <worker_secret>`. Workers write data that is later served to all clients, so they must be trusted.
 - Client endpoints (manifest, binary download) have **no authentication** — treat them like a package mirror.
 

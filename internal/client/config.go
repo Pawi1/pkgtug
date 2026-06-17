@@ -13,8 +13,9 @@ type Config struct {
 	// Legacy single-remote field — migrated to Remotes on load.
 	ServerURL string `yaml:"server_url,omitempty"`
 
-	Remotes  []Remote        `yaml:"remotes,omitempty"`
-	Telegram TelegramSection `yaml:"telegram,omitempty"`
+	Remotes    []Remote        `yaml:"remotes,omitempty"`
+	Telegram   TelegramSection `yaml:"telegram,omitempty"`
+	SelfUpdate string          `yaml:"self_update,omitempty"` // [remote:]package/component for pkgtug itself
 }
 
 type Remote struct {
