@@ -11,10 +11,14 @@ func (a *App) cmdStatus(_ []string) error {
 		return nil
 	}
 
-	fmt.Printf("%-35s  %-15s  %-20s  %s\n", "PACKAGE/COMPONENT", "REMOTE", "VERSION", "BINARY")
-	fmt.Println(strings.Repeat("-", 95))
+	fmt.Printf("%-35s  %-15s  %-20s  %-8s  %s\n", "PACKAGE/COMPONENT", "REMOTE", "VERSION", "FLAGS", "BINARY")
+	fmt.Println(strings.Repeat("-", 105))
 	for key, e := range a.state {
-		fmt.Printf("%-35s  %-15s  %-20s  %s\n", key, e.Remote, e.InstalledVersion, e.BinaryPath)
+		flags := ""
+		if e.Pinned {
+			flags = "pinned"
+		}
+		fmt.Printf("%-35s  %-15s  %-20s  %-8s  %s\n", key, e.Remote, e.InstalledVersion, flags, e.BinaryPath)
 	}
 	return nil
 }

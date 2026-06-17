@@ -70,6 +70,8 @@ func main() {
 		err = app.cmdRollback(args)
 	case "uninstall":
 		err = app.cmdUninstall(args)
+	case "pin":
+		err = app.cmdPin(args)
 	default:
 		fatalf("unknown command %q — run pkgtug --help\n", cmd)
 	}
@@ -95,6 +97,7 @@ Commands:
   check <package/component>   check for an update
   update <package/component>  update to latest (--all for all packages)
   status                   show installed packages and their remotes
+  pin <package/component>       lock version, skip in update --all (--unpin to release)
   uninstall <package/component>  remove a package from state (--remove-binary to also delete file)
   rollback <package/component>  restore previous binary from backup
   version                  print pkgtug version

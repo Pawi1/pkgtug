@@ -45,7 +45,11 @@ func (a *App) updateOne(key string) error {
 func (a *App) updateAll() error {
 	var lastErr error
 	p := a.newProgress()
-	for key := range a.state {
+	for key, entry := range a.state {
+		if entry.Pinned {
+			p.Log("skip %s (pinned at %s)", key, entry.InstalledVersion)
+			continue
+		}
 		if err := a.updateOne(key); err != nil {
 			p.Log("update %s: %v", key, err)
 			lastErr = err
