@@ -34,6 +34,8 @@ func New(cfg *config.ServerConfig) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /tug/fetch/{name}", s.handleFetch)
+	mux.HandleFunc("GET /tug/build/next", s.handleBuildNext)
+	mux.HandleFunc("POST /tug/build/{job_id}/result", s.handleBuildResult)
 	return mux
 }
 
