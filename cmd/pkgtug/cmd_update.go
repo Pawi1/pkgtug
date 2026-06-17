@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/pawi1/pkgtug/internal/client"
-	"github.com/pawi1/pkgtug/internal/tui"
 )
 
 func (a *App) cmdUpdate(args []string) error {
@@ -20,13 +19,6 @@ func (a *App) cmdUpdate(args []string) error {
 		return fmt.Errorf("usage: pkgtug update <package/component> | --all")
 	}
 	return a.updateOne(fs.Arg(0))
-}
-
-func (a *App) newProgress() client.Progress {
-	if tui.IsTerminal() {
-		return tui.New()
-	}
-	return client.PlainProgress{}
 }
 
 func (a *App) updateOne(key string) error {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/pawi1/pkgtug/internal/client"
 	"github.com/pawi1/pkgtug/internal/notify"
+	"github.com/pawi1/pkgtug/internal/tui"
 )
 
 // App holds shared state for all commands.
@@ -30,6 +31,13 @@ func (a *App) saveState() error {
 	return client.SaveState(a.statePath, a.state)
 }
 
+func (a *App) newProgress() client.Progress {
+	if tui.IsTerminal() {
+		return tui.New()
+	}
+	return client.PlainProgress{}
+}
+
 // Stubs — implemented in subsequent steps.
 
 func (a *App) cmdStatus(_ []string) error {
@@ -40,10 +48,3 @@ func (a *App) cmdRollback(_ []string) error {
 	return fmt.Errorf("not implemented yet")
 }
 
-func (a *App) cmdSearch(_ []string) error {
-	return fmt.Errorf("not implemented yet")
-}
-
-func (a *App) cmdInstall(_ []string) error {
-	return fmt.Errorf("not implemented yet")
-}
