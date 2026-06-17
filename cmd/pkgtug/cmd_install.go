@@ -79,9 +79,10 @@ func (a *App) cmdInstall(args []string) error {
 
 	defaultPath := filepath.Join("/opt", pkgName, component)
 	binaryPath := prompt("Binary path", defaultPath)
-	serviceName := promptOptional("Service name (for stop/start during update)")
+	serviceName := promptServiceName()
 	healthCheck := promptOptional("Health check URL or command")
 	backupDir := promptOptional("Backup directory (for rollback)")
+	deps := promptDependencies(a)
 
 	fmt.Println()
 	resp, err := http.Get(bin.URL)
@@ -134,6 +135,7 @@ func (a *App) cmdInstall(args []string) error {
 		HealthCheck:      healthCheck,
 		BackupDir:        backupDir,
 		AutoUpdate:       *autoUpdate,
+		DependsOn:        deps,
 	}
 	if err := a.saveState(); err != nil {
 		return fmt.Errorf("save state: %w", err)
@@ -156,6 +158,32 @@ func (a *App) cmdInstall(args []string) error {
 		fmt.Printf("  backup:   %s\n", backupDir)
 	}
 	return nil
+}
+
+// promptServiceName asks for a service name, offering a picker if services are detectable.
+func promptServiceName() string {
+	services := client.ListServices()
+	if len(services) == 0 {
+		return promptOptional("Service name (for stop/start during update)")
+	}
+	name, chosen := pickFromListOptional("Service to stop/start during update:", services)
+	if !chosen {
+		// Fall back to free text in case the service isn't in the list yet
+		return promptOptional("Service name (or Enter to skip)")
+	}
+	return name
+}
+
+// promptDependencies asks which already-installed packages this package depends on.
+func promptDependencies(a *App) []string {
+	var keys []string
+	for k := range a.state {
+		keys = append(keys, k)
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	return pickMultiFromList("Dependencies (other installed packages that must update first):", keys)
 }
 
 // parseInstallArg parses "[<remote>:]<package>[/<component>]".

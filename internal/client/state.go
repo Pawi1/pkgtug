@@ -19,6 +19,7 @@ type InstallEntry struct {
 	BackupDir        string    `json:"backup_dir,omitempty"`
 	Pinned           bool      `json:"pinned,omitempty"`
 	AutoUpdate       bool      `json:"auto_update,omitempty"`
+	DependsOn        []string  `json:"depends_on,omitempty"` // other installed package/component keys
 }
 
 // State maps "<package>/<component>" → InstallEntry.
