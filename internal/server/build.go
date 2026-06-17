@@ -136,6 +136,7 @@ func (s *Server) storeBinary(pkgName, version, platform, component string, src i
 	if err := underRoot(pkgRoot, filepath.Join(pkgDir, component)); err != nil {
 		return fmt.Errorf("path traversal detected: %w", err)
 	}
+	// codeql[go/path-injection] - all segments validated by validPathComponent and underRoot above
 	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
 		return err
 	}
@@ -165,6 +166,7 @@ func (s *Server) storeBinary(pkgName, version, platform, component string, src i
 // saveFile writes src to dst and returns the SHA-256 hex digest of the written bytes.
 // Computing the hash during the write avoids a second read of a user-supplied path.
 func saveFile(src io.Reader, dst string) (string, error) {
+	// codeql[go/path-injection] - dst is derived from segments pre-validated by storeBinary callers
 	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
 	if err != nil {
 		return "", err
