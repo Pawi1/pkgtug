@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"strings"
 
 	"github.com/pawi1/pkgtug/internal/client"
 )
@@ -11,60 +10,15 @@ import (
 func (a *App) cmdUpdate(args []string) error {
 	fs := flag.NewFlagSet("update", flag.ExitOnError)
 	all := fs.Bool("all", false, "update all installed packages")
-	autoupdate := fs.Bool("autoupdate", false, "also update pkgtug itself (requires self_update in config)")
 	fs.Parse(args)
 
 	if *all {
-		err := a.updateAll()
-		if *autoupdate {
-			if serr := a.selfUpdate(); serr != nil {
-				a.newProgress().Log("autoupdate: %v", serr)
-				if err == nil {
-					err = serr
-				}
-			}
-		}
-		return err
-	}
-	if *autoupdate {
-		return a.selfUpdate()
+		return a.updateAll()
 	}
 	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: pkgtug update <package/component> | --all [--autoupdate]")
+		return fmt.Errorf("usage: pkgtug update <package/component> | --all")
 	}
 	return a.updateOne(fs.Arg(0))
-}
-
-func (a *App) selfUpdate() error {
-	key := a.cfg.SelfUpdate
-	if key == "" {
-		return fmt.Errorf("self_update not configured — run: pkgtug autoupdate <remote>:<package>/<component>")
-	}
-	remote, pkg := splitRemoteKey(key)
-	serverURL, err := a.remoteURL(remote)
-	if err != nil {
-		return fmt.Errorf("autoupdate: %w", err)
-	}
-	p := a.newProgress()
-	updated, err := client.Update(serverURL, a.state, pkg, a.platform, p)
-	if err != nil {
-		return fmt.Errorf("autoupdate: %w", err)
-	}
-	if updated {
-		if err := a.saveState(); err != nil {
-			p.Log("save state: %v", err)
-		}
-	}
-	return nil
-}
-
-// splitRemoteKey splits "[remote:]key" into (remote, key).
-// Returns ("", key) if no remote prefix is present.
-func splitRemoteKey(s string) (remote, key string) {
-	if i := strings.Index(s, ":"); i >= 0 {
-		return s[:i], s[i+1:]
-	}
-	return "", s
 }
 
 func (a *App) updateOne(key string) error {
@@ -72,9 +26,8 @@ func (a *App) updateOne(key string) error {
 	if err != nil {
 		return err
 	}
-
 	p := a.newProgress()
-	updated, err := client.Update(serverURL, a.state, key, a.platform, p)
+	updated, err := updateEntry(a, serverURL, key, p)
 	if err != nil {
 		a.tg.UpdateFailure(key, err.Error())
 		return err
@@ -86,6 +39,11 @@ func (a *App) updateOne(key string) error {
 		a.tg.UpdateSuccess(key, a.state[key].InstalledVersion)
 	}
 	return nil
+}
+
+// updateEntry performs a single update and returns whether the binary changed.
+func updateEntry(a *App, serverURL, key string, p client.Progress) (bool, error) {
+	return client.Update(serverURL, a.state, key, a.platform, p)
 }
 
 func (a *App) updateAll() error {

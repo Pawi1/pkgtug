@@ -18,6 +18,7 @@ type InstallEntry struct {
 	HealthCheck      string    `json:"health_check,omitempty"`
 	BackupDir        string    `json:"backup_dir,omitempty"`
 	Pinned           bool      `json:"pinned,omitempty"`
+	AutoUpdate       bool      `json:"auto_update,omitempty"`
 }
 
 // State maps "<package>/<component>" → InstallEntry.

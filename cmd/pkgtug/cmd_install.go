@@ -16,6 +16,7 @@ import (
 
 func (a *App) cmdInstall(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
+	autoUpdate := fs.Bool("autoupdate", false, "mark package for automatic updates by the daemon")
 	fs.Parse(args)
 
 	if fs.NArg() == 0 {
@@ -132,12 +133,17 @@ func (a *App) cmdInstall(args []string) error {
 		ServiceName:      serviceName,
 		HealthCheck:      healthCheck,
 		BackupDir:        backupDir,
+		AutoUpdate:       *autoUpdate,
 	}
 	if err := a.saveState(); err != nil {
 		return fmt.Errorf("save state: %w", err)
 	}
 
-	fmt.Printf("\n✓ %s installed to %s\n", key, binaryPath)
+	if *autoUpdate {
+		fmt.Printf("\n✓ %s installed to %s (autoupdate enabled)\n", key, binaryPath)
+	} else {
+		fmt.Printf("\n✓ %s installed to %s\n", key, binaryPath)
+	}
 	fmt.Printf("  remote:   %s\n", remoteName)
 	fmt.Printf("  version:  %s\n", mf.Version)
 	if serviceName != "" {

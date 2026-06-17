@@ -74,6 +74,8 @@ func main() {
 		err = app.cmdPin(args)
 	case "autoupdate":
 		err = app.cmdAutoupdate(args)
+	case "daemon":
+		err = app.cmdDaemon(args)
 	default:
 		fatalf("unknown command %q — run pkgtug --help\n", cmd)
 	}
@@ -97,8 +99,9 @@ Commands:
   search [<query>]         search available packages across all remotes
   install [<remote>:]<package>[/<component>]  install a package
   check <package/component>   check for an update
-  update <package/component>  update to latest (--all for all packages, --autoupdate to include pkgtug itself)
-  autoupdate [<remote>:<pkg>/<comp>]  configure pkgtug self-update key (--clear to disable)
+  update <package/component>  update to latest (--all for all packages)
+  autoupdate [<package/component>]    mark/unmark package for daemon autoupdate (--remove to unmark)
+  daemon                   run as daemon — auto-updates marked packages (--interval, default 15m)
   status                   show installed packages and their remotes
   pin <package/component>       lock version, skip in update --all (--unpin to release)
   uninstall <package/component>  remove a package from state (--remove-binary to also delete file)

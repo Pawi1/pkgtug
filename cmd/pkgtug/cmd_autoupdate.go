@@ -5,39 +5,42 @@ import (
 	"fmt"
 )
 
-// cmdAutoupdate configures (or shows) the self_update key used by --autoupdate.
+// cmdAutoupdate marks/unmarks an installed package for automatic updates by the daemon.
 //
-//	pkgtug autoupdate                          — show current setting
-//	pkgtug autoupdate <remote>:<pkg>/<comp>   — set the key
-//	pkgtug autoupdate --clear                  — clear the key
+//	pkgtug autoupdate <package/component>          — enable
+//	pkgtug autoupdate --remove <package/component> — disable
+//	pkgtug autoupdate                              — list marked packages
 func (a *App) cmdAutoupdate(args []string) error {
 	fs := flag.NewFlagSet("autoupdate", flag.ExitOnError)
-	clear := fs.Bool("clear", false, "clear the self_update key")
+	remove := fs.Bool("remove", false, "remove autoupdate mark")
 	fs.Parse(args)
 
-	if *clear {
-		a.cfg.SelfUpdate = ""
-		if err := a.saveConfig(); err != nil {
-			return err
-		}
-		fmt.Println("autoupdate disabled")
-		return nil
-	}
-
 	if fs.NArg() == 0 {
-		if a.cfg.SelfUpdate == "" {
-			fmt.Println("autoupdate: not configured")
-		} else {
-			fmt.Printf("autoupdate: %s\n", a.cfg.SelfUpdate)
+		found := false
+		for key, e := range a.state {
+			if e.AutoUpdate {
+				fmt.Println(key)
+				found = true
+			}
+		}
+		if !found {
+			fmt.Println("no packages marked for autoupdate")
 		}
 		return nil
 	}
 
 	key := fs.Arg(0)
-	a.cfg.SelfUpdate = key
-	if err := a.saveConfig(); err != nil {
-		return err
+	entry := a.state[key]
+	if entry == nil {
+		return fmt.Errorf("%s: not installed", key)
 	}
-	fmt.Printf("autoupdate set to %s\n", key)
-	return nil
+
+	if *remove {
+		entry.AutoUpdate = false
+		fmt.Printf("%s: autoupdate disabled\n", key)
+	} else {
+		entry.AutoUpdate = true
+		fmt.Printf("%s: marked for autoupdate\n", key)
+	}
+	return a.saveState()
 }
