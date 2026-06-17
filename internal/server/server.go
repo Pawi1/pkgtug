@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log"
 	"net/http"
 	"sync"
 
@@ -25,6 +26,29 @@ func New(cfg *config.ServerConfig) *Server {
 		pkgs[name] = &cfg.Packages[i]
 		states[name] = newPackageState()
 	}
+
+	// Restore persisted state (best-effort — don't fail startup on error).
+	if saved, err := loadPersistedState(cfg.Server.DataDir); err != nil {
+		log.Printf("server: could not load persisted state: %v", err)
+	} else {
+		for name, ps := range saved {
+			st, ok := states[name]
+			if !ok {
+				// Package was removed from config — skip its saved state.
+				log.Printf("server: skipping persisted state for unknown package %q", name)
+				continue
+			}
+			st.currentVersion = ps.CurrentVersion
+			for plat, ver := range ps.BuiltVersions {
+				st.builtVersions[plat] = ver
+			}
+			if ps.CurrentVersion != "" {
+				log.Printf("server: restored %s — version %s, built on %d platform(s)",
+					name, ps.CurrentVersion, len(ps.BuiltVersions))
+			}
+		}
+	}
+
 	tg := cfg.Telegram
 	return &Server{
 		cfg:      cfg,
@@ -32,6 +56,12 @@ func New(cfg *config.ServerConfig) *Server {
 		states:   states,
 		jobs:     newJobRegistry(),
 		tg:       notify.NewTelegram(tg.BotToken, tg.ChatID),
+	}
+}
+
+func (s *Server) persistState() {
+	if err := savePersistedState(s.cfg.Server.DataDir, s.states); err != nil {
+		log.Printf("server: persist state: %v", err)
 	}
 }
 
