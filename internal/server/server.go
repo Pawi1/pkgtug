@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/pawi1/pkgtug/internal/config"
+	"github.com/pawi1/pkgtug/internal/notify"
 )
 
 type Server struct {
@@ -12,6 +13,7 @@ type Server struct {
 	packages map[string]*config.Package
 	states   map[string]*packageState
 	jobs     *jobRegistry
+	tg       *notify.Telegram
 	fetchMu  sync.Map // per-package mutex to serialize concurrent fetches
 }
 
@@ -23,11 +25,13 @@ func New(cfg *config.ServerConfig) *Server {
 		pkgs[name] = &cfg.Packages[i]
 		states[name] = newPackageState()
 	}
+	tg := cfg.Telegram
 	return &Server{
 		cfg:      cfg,
 		packages: pkgs,
 		states:   states,
 		jobs:     newJobRegistry(),
+		tg:       notify.NewTelegram(tg.BotToken, tg.ChatID),
 	}
 }
 
