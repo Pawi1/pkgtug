@@ -125,7 +125,7 @@ func (s *Server) storeBuildResult(job *Job, r *http.Request) error {
 
 // storeBinary saves one binary file and updates the package manifest atomically.
 func (s *Server) storeBinary(pkgName, version, platform, component string, src io.Reader) error {
-	for _, seg := range []string{version, platform, component} {
+	for _, seg := range []string{pkgName, version, platform, component} {
 		if err := validPathComponent(seg); err != nil {
 			return fmt.Errorf("invalid upload field: %w", err)
 		}

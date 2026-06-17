@@ -40,7 +40,7 @@ func (s *Server) handleBinaryDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, seg := range []string{version, platform, component} {
+	for _, seg := range []string{name, version, platform, component} {
 		if err := validPathComponent(seg); err != nil {
 			http.Error(w, "invalid path: "+err.Error(), http.StatusBadRequest)
 			return
