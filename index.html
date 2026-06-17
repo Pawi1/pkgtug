@@ -261,6 +261,59 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  #health-bar {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  #health-bar.visible { display: flex; }
+
+  .h-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .h-dot.ok  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .h-dot.err { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+
+  .h-chip {
+    background: rgba(255,255,255,.05);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .h-chip span { color: var(--text); }
+
+  .h-sep { width: 1px; height: 16px; background: var(--border); }
+
+  .h-pkg-list {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+  .h-pkg {
+    background: rgba(99,102,241,.1);
+    border: 1px solid rgba(99,102,241,.25);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+  }
+  .h-pkg .h-ver { color: var(--muted); margin-left: 4px; }
+
   @media (max-width: 600px) {
     header { flex-wrap: wrap; }
     .push-form { grid-template-columns: 1fr; }
@@ -280,6 +333,7 @@
 </header>
 
 <main>
+  <div id="health-bar"></div>
   <div id="status"></div>
   <div id="pkg-count"></div>
   <div id="pkg-list"></div>
@@ -322,12 +376,47 @@ async function apiFetch(path) {
   return r.json();
 }
 
+// ── health check ──────────────────────────────────────────────────────────────
+
+async function loadHealth() {
+  const bar = document.getElementById('health-bar');
+  bar.className = '';
+  bar.innerHTML = '';
+  try {
+    const h = await apiFetch('/healthz');
+    const dot = el('div', 'h-dot ' + (h.status === 'ok' ? 'ok' : 'err'));
+    const os = el('span', 'h-chip');
+    os.innerHTML = '<span>' + esc(h.goos) + '/' + esc(h.goarch) + '</span>';
+    const sep = el('div', 'h-sep');
+    const pkgList = el('div', 'h-pkg-list');
+    const pkgs = h.packages || {};
+    const names = Object.keys(pkgs).sort();
+    if (names.length === 0) {
+      const none = el('span', 'h-chip');
+      none.textContent = 'no packages';
+      pkgList.appendChild(none);
+    } else {
+      for (const name of names) {
+        const chip = el('span', 'h-pkg');
+        chip.innerHTML = esc(name) + (pkgs[name] ? '<span class="h-ver">' + esc(pkgs[name]) + '</span>' : '');
+        pkgList.appendChild(chip);
+      }
+    }
+    bar.append(dot, os, sep, pkgList);
+    bar.classList.add('visible');
+  } catch (_) {
+    // healthz unavailable — hide bar silently
+  }
+}
+
 // ── load packages ─────────────────────────────────────────────────────────────
 
 async function loadPackages() {
   setStatus('info', '<span class="spinner"></span>  Connecting to ' + esc(serverURL) + ' …');
   document.getElementById('pkg-list').innerHTML = '';
   document.getElementById('pkg-count').textContent = '';
+
+  loadHealth();
 
   let pkgs;
   try {
