@@ -79,6 +79,7 @@ func (a *App) cmdInstall(args []string) error {
 
 	defaultPath := filepath.Join("/opt", pkgName, component)
 	binaryPath := prompt("Binary path", defaultPath)
+	postInstall := promptPostInstall(binaryPath)
 	serviceName := promptServiceName()
 	healthCheck := promptOptional("Health check URL or command")
 	backupDir := promptOptional("Backup directory (for rollback)")
@@ -126,16 +127,19 @@ func (a *App) cmdInstall(args []string) error {
 		return fmt.Errorf("install binary: %w", err)
 	}
 
+	installedSHA, _ := client.SHA256File(binaryPath)
 	a.state[key] = &client.InstallEntry{
 		Remote:           remoteName,
 		InstalledVersion: mf.Version,
 		UpdatedAt:        time.Now().UTC(),
 		BinaryPath:       binaryPath,
+		PostInstall:      postInstall,
 		ServiceName:      serviceName,
 		HealthCheck:      healthCheck,
 		BackupDir:        backupDir,
 		AutoUpdate:       *autoUpdate,
 		DependsOn:        deps,
+		InstalledSHA256:  installedSHA,
 	}
 	if err := a.saveState(); err != nil {
 		return fmt.Errorf("save state: %w", err)
@@ -158,6 +162,63 @@ func (a *App) cmdInstall(args []string) error {
 		fmt.Printf("  backup:   %s\n", backupDir)
 	}
 	return nil
+}
+
+// promptPostInstall suggests a post-install command based on the install path and
+// lets the user accept, edit in $EDITOR, or skip.
+func promptPostInstall(binaryPath string) string {
+	suggestion := suggestPostInstall(binaryPath)
+
+	if suggestion == "" {
+		fmt.Print("Post-install command (runs after each update, Enter to skip): ")
+		line, _ := stdinReader.ReadString('\n')
+		return strings.TrimSpace(line)
+	}
+
+	fmt.Printf("Post-install command [%s]: ", suggestion)
+	fmt.Println()
+	fmt.Println("  1) accept suggestion")
+	fmt.Println("  e) edit in $EDITOR")
+	fmt.Println("  0) skip")
+
+	for {
+		raw := strings.TrimSpace(prompt("Select", "1"))
+		switch raw {
+		case "1", "":
+			return suggestion
+		case "0":
+			return ""
+		case "e", "E":
+			val, err := editInEditor(suggestion)
+			if err != nil {
+				fmt.Printf("  editor error: %v\n", err)
+				continue
+			}
+			return val
+		default:
+			fmt.Println("  enter 0, 1, or e")
+		}
+	}
+}
+
+// suggestPostInstall returns a sensible post-install command based on the target path.
+func suggestPostInstall(path string) string {
+	switch {
+	case strings.HasPrefix(path, "/etc/systemd/") && strings.HasSuffix(path, ".service"):
+		// Extract unit name for enable suggestion
+		base := filepath.Base(path)
+		unit := strings.TrimSuffix(base, ".service")
+		return "systemctl daemon-reload && systemctl enable " + unit
+	case strings.HasPrefix(path, "/etc/systemd/"):
+		return "systemctl daemon-reload"
+	case strings.HasPrefix(path, "/etc/init.d/"):
+		base := filepath.Base(path)
+		return "rc-update add " + base + " default"
+	case strings.HasPrefix(path, "/etc/conf.d/") || strings.HasPrefix(path, "/etc/rc.d/"):
+		return ""
+	default:
+		return ""
+	}
 }
 
 // promptServiceName asks for a service name, offering a picker if services are detectable.

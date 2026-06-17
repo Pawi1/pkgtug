@@ -20,6 +20,8 @@ type InstallEntry struct {
 	Pinned           bool      `json:"pinned,omitempty"`
 	AutoUpdate       bool      `json:"auto_update,omitempty"`
 	DependsOn        []string  `json:"depends_on,omitempty"` // other installed package/component keys
+	PostInstall      string    `json:"post_install,omitempty"`  // shell command run after each update
+	InstalledSHA256  string    `json:"installed_sha256,omitempty"` // SHA256 of file as pkgtug last wrote it
 }
 
 // State maps "<package>/<component>" → InstallEntry.

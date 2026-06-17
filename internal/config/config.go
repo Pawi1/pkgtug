@@ -20,8 +20,9 @@ type ServerSection struct {
 	BaseURL         string        `yaml:"base_url"`
 	DataDir         string        `yaml:"data_dir"`
 	WorkerSecret    string        `yaml:"worker_secret"`
-	CORSOrigins     []string      `yaml:"cors_origins"`      // e.g. ["*"] or ["https://user.github.io"]
-	WebhookCooldown time.Duration `yaml:"webhook_cooldown"`  // min gap between webhook fetches per package (default 30s)
+	CORSOrigins     []string      `yaml:"cors_origins"`     // e.g. ["*"] or ["https://user.github.io"]
+	WebhookCooldown time.Duration `yaml:"webhook_cooldown"` // min gap between webhook fetches per package (default 10s)
+	MaxUploadSize   ByteSize      `yaml:"max_upload_size"`  // max size per uploaded file; 0 = unlimited
 }
 
 type TelegramSection struct {

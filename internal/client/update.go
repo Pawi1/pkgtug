@@ -122,6 +122,15 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		}
 	}
 
+	// Conflict detection for user-editable files (non-empty InstalledSHA256 baseline).
+	if entry.InstalledSHA256 != "" {
+		if abort, err := handleConflict(p, key, entry, tmpFile, bin.SHA256); err != nil {
+			return false, err
+		} else if abort {
+			return false, nil
+		}
+	}
+
 	// Atomic replace
 	if err := atomicReplace(tmpFile, entry.BinaryPath); err != nil {
 		StartService(entry.ServiceName) // best-effort restart
@@ -135,6 +144,15 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		if err := StartService(entry.ServiceName); err != nil {
 			doRollback(entry, backupPath, p)
 			return false, fmt.Errorf("start service: %w", err)
+		}
+	}
+
+	// Post-install hook (e.g. systemctl daemon-reload)
+	if entry.PostInstall != "" {
+		p.Log("%s: running post-install: %s", key, entry.PostInstall)
+		cmd := exec.Command("sh", "-c", entry.PostInstall)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return false, fmt.Errorf("post-install: %w\n%s", err, out)
 		}
 	}
 
@@ -152,6 +170,7 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 
 	// Update state
 	entry.InstalledVersion = mf.Version
+	entry.InstalledSHA256 = bin.SHA256
 	entry.UpdatedAt = time.Now().UTC()
 	p.Log("%s: ✓ updated to %s", key, mf.Version)
 	return true, nil
@@ -280,6 +299,93 @@ func healthCheckCmd(command string) error {
 		return fmt.Errorf("command %q failed: %w\n%s", command, err, out)
 	}
 	return nil
+}
+
+// handleConflict checks whether the on-disk file was user-modified while a new
+// version is also available. Returns (abort bool, err).
+func handleConflict(p Progress, key string, entry *InstallEntry, newTmp, newSHA256 string) (bool, error) {
+	currentSHA, err := sha256File(entry.BinaryPath)
+	if err != nil {
+		// File missing or unreadable — no conflict, proceed normally.
+		return false, nil
+	}
+
+	userModified := currentSHA != entry.InstalledSHA256
+	newDiffers := newSHA256 != entry.InstalledSHA256
+
+	if !userModified || !newDiffers {
+		return false, nil
+	}
+
+	// Genuine conflict: user changed the file AND a new version arrived.
+	diffText := runDiff(entry.BinaryPath, newTmp)
+	action := p.ResolveConflict(key, entry.BinaryPath, diffText)
+
+	switch action {
+	case ConflictUseNew:
+		return false, nil
+
+	case ConflictKeepCurrent:
+		dest := entry.BinaryPath + ".pkgtug-new"
+		if err := copyFile(newTmp, dest); err != nil {
+			p.Log("%s: could not save .pkgtug-new: %v", key, err)
+		} else {
+			p.Log("%s: new version saved to %s", key, dest)
+		}
+		return true, nil // skip the atomic replace
+
+	case ConflictEdit:
+		dest := entry.BinaryPath + ".pkgtug-new"
+		_ = copyFile(newTmp, dest)
+		p.Log("%s: new version at %s — edit %s, then re-run update", key, dest, entry.BinaryPath)
+		return true, nil
+
+	case ConflictAbort:
+		return true, nil
+
+	default:
+		return false, nil
+	}
+}
+
+func SHA256File(path string) (string, error) {
+	return sha256File(path)
+}
+
+func sha256File(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func runDiff(current, next string) string {
+	out, err := exec.Command("diff", "-u", "--label", "current", "--label", "new", current, next).CombinedOutput()
+	if err == nil || len(out) > 0 {
+		return string(out)
+	}
+	return ""
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
 }
 
 func SplitKey(key string) (pkg, component string, err error) {

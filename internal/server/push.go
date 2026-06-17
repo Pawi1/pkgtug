@@ -27,7 +27,7 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	s.limitUpload(w, r)
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
 		http.Error(w, "parse form: "+err.Error(), http.StatusBadRequest)
 		return

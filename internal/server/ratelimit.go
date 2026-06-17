@@ -1,6 +1,17 @@
 package server
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
+
+// limitUpload wraps r.Body with MaxBytesReader when max_upload_size is configured.
+// If the limit is 0 (unlimited), the body is left unchanged.
+func (s *Server) limitUpload(w http.ResponseWriter, r *http.Request) {
+	if limit := int64(s.cfg.Server.MaxUploadSize); limit > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
+	}
+}
 
 // webhookAllowed returns true and records the current time if the per-package
 // cooldown has elapsed since the last accepted webhook. Returns false otherwise.

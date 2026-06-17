@@ -15,8 +15,6 @@ import (
 	"github.com/pawi1/pkgtug/internal/manifest"
 )
 
-const maxUploadSize = 512 << 20 // 512 MB
-
 func (s *Server) handleBuildNext(w http.ResponseWriter, r *http.Request) {
 	if !s.authWorker(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -71,7 +69,7 @@ func (s *Server) handleBuildResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	s.limitUpload(w, r)
 	if err := r.ParseMultipartForm(64 << 20); err != nil {
 		http.Error(w, "parse form: "+err.Error(), http.StatusBadRequest)
 		return
