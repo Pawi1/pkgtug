@@ -19,24 +19,24 @@ func (a *App) cmdInstall(args []string) error {
 	fs.Parse(args)
 
 	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: pkgtug install <package>[/<component>]")
+		return fmt.Errorf("usage: pkgtug install [<remote>:]<package>[/<component>]")
 	}
 
-	arg := fs.Arg(0)
-	var pkgName, component string
+	remoteName, pkgName, component, err := parseInstallArg(fs.Arg(0))
+	if err != nil {
+		return err
+	}
 
-	if idx := strings.Index(arg, "/"); idx >= 0 {
-		pkgName = arg[:idx]
-		component = arg[idx+1:]
-	} else {
-		pkgName = arg
+	// Resolve remote URL — auto-discover if not specified
+	serverURL, remoteName, err := a.resolveRemote(remoteName, pkgName)
+	if err != nil {
+		return err
 	}
 
 	p := a.newProgress()
 
-	// Fetch manifest to know available components
 	p.StartSpinner("fetching manifest")
-	mf, err := client.FetchManifest(a.cfg.ServerURL, pkgName)
+	mf, err := client.FetchManifest(serverURL, pkgName)
 	p.StopSpinner()
 	if err != nil {
 		return err
@@ -74,8 +74,7 @@ func (a *App) cmdInstall(args []string) error {
 
 	key := pkgName + "/" + component
 
-	// Interactive prompts
-	fmt.Printf("\nInstalling %s (version %s)\n\n", key, mf.Version)
+	fmt.Printf("\nInstalling %s from %s (version %s)\n\n", key, remoteName, mf.Version)
 
 	defaultPath := filepath.Join("/opt", pkgName, component)
 	binaryPath := prompt("Binary path", defaultPath)
@@ -83,7 +82,6 @@ func (a *App) cmdInstall(args []string) error {
 	healthCheck := promptOptional("Health check URL or command")
 	backupDir := promptOptional("Backup directory (for rollback)")
 
-	// Download
 	fmt.Println()
 	resp, err := http.Get(bin.URL)
 	if err != nil {
@@ -126,8 +124,8 @@ func (a *App) cmdInstall(args []string) error {
 		return fmt.Errorf("install binary: %w", err)
 	}
 
-	// Save to state
 	a.state[key] = &client.InstallEntry{
+		Remote:           remoteName,
 		InstalledVersion: mf.Version,
 		UpdatedAt:        time.Now().UTC(),
 		BinaryPath:       binaryPath,
@@ -140,6 +138,7 @@ func (a *App) cmdInstall(args []string) error {
 	}
 
 	fmt.Printf("\n✓ %s installed to %s\n", key, binaryPath)
+	fmt.Printf("  remote:   %s\n", remoteName)
 	fmt.Printf("  version:  %s\n", mf.Version)
 	if serviceName != "" {
 		fmt.Printf("  service:  %s\n", serviceName)
@@ -151,4 +150,55 @@ func (a *App) cmdInstall(args []string) error {
 		fmt.Printf("  backup:   %s\n", backupDir)
 	}
 	return nil
+}
+
+// parseInstallArg parses "[<remote>:]<package>[/<component>]".
+func parseInstallArg(arg string) (remoteName, pkgName, component string, err error) {
+	if idx := strings.Index(arg, ":"); idx >= 0 {
+		remoteName = arg[:idx]
+		arg = arg[idx+1:]
+	}
+	if idx := strings.Index(arg, "/"); idx >= 0 {
+		pkgName = arg[:idx]
+		component = arg[idx+1:]
+	} else {
+		pkgName = arg
+	}
+	if pkgName == "" {
+		err = fmt.Errorf("invalid argument — expected [<remote>:]<package>[/<component>]")
+	}
+	return
+}
+
+// resolveRemote returns (serverURL, remoteName) for install.
+// If remoteName is empty it searches all remotes for the package.
+func (a *App) resolveRemote(remoteName, pkgName string) (string, string, error) {
+	if remoteName != "" {
+		url, err := a.cfg.RemoteURL(remoteName)
+		return url, remoteName, err
+	}
+	if len(a.cfg.Remotes) == 0 {
+		return "", "", fmt.Errorf("no remotes configured — run: pkgtug remote add <name> <url>")
+	}
+	if len(a.cfg.Remotes) == 1 {
+		r := a.cfg.Remotes[0]
+		return r.URL, r.Name, nil
+	}
+	// Search all remotes for the package
+	p := a.newProgress()
+	for _, r := range a.cfg.Remotes {
+		p.StartSpinner("checking " + r.Name)
+		list, err := client.FetchPackages(r.URL)
+		p.StopSpinner()
+		if err != nil {
+			continue
+		}
+		for _, e := range list {
+			if e.Name == pkgName {
+				fmt.Printf("found %s on remote %q\n", pkgName, r.Name)
+				return r.URL, r.Name, nil
+			}
+		}
+	}
+	return "", "", fmt.Errorf("package %q not found on any remote", pkgName)
 }

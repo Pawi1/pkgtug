@@ -21,11 +21,11 @@ type CheckResult struct {
 	UpdateAvailable  bool
 }
 
-func Check(cfg *Config, state State, key, platform string) (*CheckResult, error) {
-	return CheckWithProgress(cfg, state, key, platform, PlainProgress{})
+func Check(serverURL string, state State, key, platform string) (*CheckResult, error) {
+	return CheckWithProgress(serverURL, state, key, platform, PlainProgress{})
 }
 
-func CheckWithProgress(cfg *Config, state State, key, platform string, p Progress) (*CheckResult, error) {
+func CheckWithProgress(serverURL string, state State, key, platform string, p Progress) (*CheckResult, error) {
 	pkg, component, err := SplitKey(key)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func CheckWithProgress(cfg *Config, state State, key, platform string, p Progres
 	}
 
 	p.StartSpinner("checking " + key)
-	mf, err := FetchManifest(cfg.ServerURL, pkg)
+	mf, err := FetchManifest(serverURL, pkg)
 	p.StopSpinner()
 	if err != nil {
 		return nil, err
@@ -62,12 +62,12 @@ func CheckWithProgress(cfg *Config, state State, key, platform string, p Progres
 
 // Update performs the full update flow for one installed entry.
 // It returns (updated bool, err).
-func Update(cfg *Config, state State, key, platform string, p Progress) (bool, error) {
+func Update(serverURL string, state State, key, platform string, p Progress) (bool, error) {
 	if p == nil {
 		p = PlainProgress{}
 	}
 
-	result, err := CheckWithProgress(cfg, state, key, platform, p)
+	result, err := CheckWithProgress(serverURL, state, key, platform, p)
 	if err != nil {
 		return false, err
 	}
@@ -83,7 +83,7 @@ func Update(cfg *Config, state State, key, platform string, p Progress) (bool, e
 	}
 
 	pkg, component, _ := SplitKey(key)
-	mf, err := FetchManifest(cfg.ServerURL, pkg)
+	mf, err := FetchManifest(serverURL, pkg)
 	if err != nil {
 		return false, err
 	}

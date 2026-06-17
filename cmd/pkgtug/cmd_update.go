@@ -22,8 +22,13 @@ func (a *App) cmdUpdate(args []string) error {
 }
 
 func (a *App) updateOne(key string) error {
+	serverURL, err := a.serverURLForKey(key)
+	if err != nil {
+		return err
+	}
+
 	p := a.newProgress()
-	updated, err := client.Update(a.cfg, a.state, key, a.platform, p)
+	updated, err := client.Update(serverURL, a.state, key, a.platform, p)
 	if err != nil {
 		a.tg.UpdateFailure(key, err.Error())
 		return err

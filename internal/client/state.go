@@ -10,6 +10,7 @@ import (
 
 // InstallEntry holds everything pkgtug needs to manage one installed binary.
 type InstallEntry struct {
+	Remote           string    `json:"remote"`
 	InstalledVersion string    `json:"installed_version"`
 	UpdatedAt        time.Time `json:"updated_at"`
 	BinaryPath       string    `json:"binary_path"`

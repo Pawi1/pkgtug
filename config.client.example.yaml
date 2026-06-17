@@ -1,0 +1,9 @@
+remotes:
+  - name: main
+    url: https://tug.example.com
+  - name: community
+    url: https://tug.community.example.com
+
+telegram:          # optional — leave empty to disable
+  bot_token: ""
+  chat_id: ""

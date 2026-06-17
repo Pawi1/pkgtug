@@ -30,7 +30,6 @@ func main() {
 	cmd := flag.Arg(0)
 	args := flag.Args()[1:]
 
-	// Commands that don't need config/state
 	switch cmd {
 	case "version":
 		fmt.Println("pkgtug", version)
@@ -52,9 +51,15 @@ func main() {
 		fatalf("detect platform: %v\n", err)
 	}
 
-	app := newApp(cfg, *statePath, state, platform)
+	app := newApp(cfg, *configPath, *statePath, state, platform)
 
 	switch cmd {
+	case "remote":
+		err = app.cmdRemote(args)
+	case "search":
+		err = app.cmdSearch(args)
+	case "install":
+		err = app.cmdInstall(args)
 	case "check":
 		err = app.cmdCheck(args)
 	case "update":
@@ -63,10 +68,6 @@ func main() {
 		err = app.cmdStatus(args)
 	case "rollback":
 		err = app.cmdRollback(args)
-	case "search":
-		err = app.cmdSearch(args)
-	case "install":
-		err = app.cmdInstall(args)
 	default:
 		fatalf("unknown command %q — run pkgtug --help\n", cmd)
 	}
@@ -83,12 +84,16 @@ Usage:
   pkgtug [flags] <command> [args]
 
 Commands:
-  search <query>           list available packages
-  install <pkg/component>  install a package component
-  check <pkg/component>    check for updates
-  update <pkg/component>   update to latest version (use --all for all)
-  status                   show installed packages and versions
-  rollback <pkg/component> restore previous binary from backup
+  remote add <name> <url>  add a package server
+  remote remove <name>     remove a package server
+  remote list              list configured servers
+
+  search [<query>]         search available packages across all remotes
+  install [<remote>:]<package>[/<component>]  install a package
+  check <package/component>   check for an update
+  update <package/component>  update to latest (--all for all packages)
+  status                   show installed packages and their remotes
+  rollback <package/component>  restore previous binary from backup
   version                  print pkgtug version
 
 Flags:

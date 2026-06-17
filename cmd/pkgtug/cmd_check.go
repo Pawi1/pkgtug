@@ -16,7 +16,12 @@ func (a *App) cmdCheck(args []string) error {
 	}
 	key := fs.Arg(0)
 
-	result, err := client.CheckWithProgress(a.cfg, a.state, key, a.platform, a.newProgress())
+	serverURL, err := a.serverURLForKey(key)
+	if err != nil {
+		return err
+	}
+
+	result, err := client.CheckWithProgress(serverURL, a.state, key, a.platform, a.newProgress())
 	if err != nil {
 		return err
 	}
