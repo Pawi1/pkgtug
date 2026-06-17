@@ -68,6 +68,7 @@ func (s *Server) persistState() {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	// public — no auth
+	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("POST /tug/fetch/{name}", s.handleFetch)
 	mux.HandleFunc("GET /tug/repo/{name}/manifest.json", s.handleManifest)
 	mux.HandleFunc("GET /tug/repo/{name}/binaries/{version}/{platform}/{component}", s.handleBinaryDownload)
