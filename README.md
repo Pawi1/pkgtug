@@ -44,7 +44,8 @@ server:
   worker_secret: "random-secret-shared-with-workers"
   cors_origins:
     - "*"              # required for the browser UI; restrict to your domain if preferred
-  webhook_cooldown: "10s"   # min gap between webhook fetches per package (default 10s)
+  webhook_cooldown: "10s"    # min gap between webhook fetches per package (default 10s)
+  # max_upload_size: "100MB" # optional — limit per-file upload (e.g. for Cloudflare Tunnel)
 
 telegram:          # optional — leave empty to disable
   bot_token: ""
@@ -64,6 +65,10 @@ packages:
     binaries:
       - component: server
         path: dist/myapp
+      - component: systemd   # optional: ship the systemd unit file as a component
+        path: contrib/myapp.service
+      - component: openrc    # optional: ship the OpenRC init script as a component
+        path: contrib/myapp.openrc
 ```
 
 `version_source.type`:
@@ -71,6 +76,8 @@ packages:
 - `branch` — version string is an 8-char commit SHA; any new commit triggers a build
 
 `poll_interval` is a backup for missed webhooks. The server also clones the repository automatically on first startup if `local_clone` does not exist.
+
+`max_upload_size` accepts human-readable values: `"100MB"`, `"512MB"`, `"1GB"`, or a plain byte count. Omit or set to `0` for no limit.
 
 ### Run
 
@@ -99,7 +106,7 @@ On startup the server:
 
 Configure the webhook in your forge: `POST https://tug.example.com/tug/fetch/<name>`. No secret needed — it only runs `git fetch`.
 
-Repeated webhook calls within the cooldown window (`webhook_cooldown`, default 10 s) are rejected with `429 Too Many Requests` to protect the server from accidental flooding.
+Repeated webhook calls within the cooldown window (`webhook_cooldown`, default 10 s) are rejected with `429 Too Many Requests`.
 
 ### Health check
 
@@ -110,9 +117,7 @@ curl https://tug.example.com/healthz
 ```json
 {
   "status": "ok",
-  "packages": {
-    "myapp": "26.07.02-stable"
-  },
+  "packages": { "myapp": "26.07.02-stable" },
   "goos": "linux",
   "goarch": "amd64"
 }
@@ -131,9 +136,7 @@ curl -X POST https://tug.example.com/tug/repo/myapp/push \
   -F "file=@myapp-1.2.3-x86_64.AppImage"
 ```
 
-Multiple platforms: repeat the call with a different `platform` value — each push adds an entry to the manifest without overwriting others. A Telegram notification is sent on each successful push (if configured).
-
-The package must still be declared in `server.yaml` (so the server knows about it), but `build_command` and `binaries` are irrelevant for direct-push packages — they exist only to keep the config schema consistent.
+Multiple platforms: repeat the call with a different `platform` value. The package must still be declared in `server.yaml`, but `build_command` and `binaries` are irrelevant for direct-push packages.
 
 ## Worker
 
@@ -172,86 +175,123 @@ Copy `contrib/github-actions-worker.yml` to `.github/workflows/pkgtug-build.yml`
 
 Add a variable `PKGTUG_PLATFORM` (e.g. `linux-x64`) in GitHub Settings → Variables.
 
-The workflow triggers on every push, so it runs in parallel with the webhook — the `--wait` window covers any timing gap.
-
 ## Client (`pkgtug`)
 
 ### Remotes
 
-pkgtug supports multiple package servers (remotes), similar to Flatpak. Each remote is a named pkgtug-server instance.
+pkgtug supports multiple package servers (remotes), similar to Flatpak.
 
 ```sh
-# add a server
 pkgtug remote add main    https://tug.example.com
 pkgtug remote add nightly https://tug-nightly.example.com
-
-# list configured servers
 pkgtug remote list
-
-# remove a server
 pkgtug remote remove nightly
 ```
 
-Remotes are stored in `/etc/pkgtug/config.yaml`. The file is managed by the CLI — no manual editing required.
-
-### Configuration
-
-`/etc/pkgtug/config.yaml` (managed by `pkgtug remote`):
-
-```yaml
-remotes:
-  - name: main
-    url: https://tug.example.com
-  - name: community
-    url: https://tug.community.example.com
-
-telegram:          # optional — leave empty to disable
-  bot_token: ""
-  chat_id: ""
-```
+Remotes are stored in `/etc/pkgtug/config.yaml` and managed by the CLI.
 
 ### Usage
 
 ```sh
-# search across all remotes
+# search / install
 pkgtug search myapp
+pkgtug install myapp/server               # auto-discovers remote
+pkgtug install main:myapp/server          # explicit remote
+pkgtug install --autoupdate myapp/server  # mark for daemon auto-update
 
-# search a specific remote
-pkgtug search --remote community myapp
-
-# install — auto-discovers which remote has the package
-pkgtug install myapp/server
-
-# install from a specific remote
-pkgtug install main:myapp/server
-
-# check for update
-pkgtug check myapp/server
-
-# update one package
+# update
 pkgtug update myapp/server
+pkgtug update --all                       # skips pinned packages
 
-# update everything installed (skips pinned packages)
-pkgtug update --all
+# daemon — background process that auto-updates marked packages
+pkgtug daemon --interval 15m
 
-# show installed packages (remote, version, pin status)
-pkgtug status
+# mark / unmark for daemon
+pkgtug autoupdate myapp/server            # enable
+pkgtug autoupdate --remove myapp/server   # disable
+pkgtug autoupdate                         # list marked packages
 
-# pin a package — lock version, exclude from update --all
-pkgtug pin myapp/server
-
-# release the pin
+# pin / unpin
+pkgtug pin myapp/server                   # lock version, skip in update --all
 pkgtug pin --unpin myapp/server
 
-# restore previous binary from backup
+# status, rollback, uninstall
+pkgtug status
 pkgtug rollback myapp/server
-
-# remove from state (add --remove-binary to also delete the file)
 pkgtug uninstall myapp/server
 pkgtug uninstall --remove-binary myapp/server
 ```
 
-`install` is interactive: it prompts for binary path, service name (for stop/start during updates), health check URL or command, and backup directory. All prompts except the path have defaults or can be skipped with Enter.
+### Interactive install
+
+`pkgtug install` is fully interactive. For each component it asks:
+
+1. **Binary path** — where to place the file on disk
+2. **Post-install command** — shell command run after every update (e.g. `systemctl daemon-reload`). pkgtug suggests a command based on the target path:
+   - `/etc/systemd/system/*.service` → `systemctl daemon-reload && systemctl enable <unit>`
+   - `/etc/init.d/*` → `rc-update add <name> default`
+3. **Service** — name of the service to stop before and start after the binary is replaced. A picker lists all services detected from `systemctl` / `rc-service`. Type `e` to open `$EDITOR` for manual entry.
+4. **Health check** — URL or shell command verified after start (retried up to 5×)
+5. **Backup directory** — where to keep the previous binary for `pkgtug rollback`
+6. **Dependencies** — other installed `package/component` keys that must be updated before this one
+
+### Service files as components
+
+A package can ship its own daemon configuration as separate components alongside the binary:
+
+```
+pkgtug install myapp/systemd
+  Binary path: /etc/systemd/system/myapp.service
+  Post-install: systemctl daemon-reload && systemctl enable myapp  ← suggested
+
+pkgtug install myapp/server
+  Dependencies: 1) myapp/systemd   ← choose
+```
+
+`pkgtug update --all` then respects the dependency order: unit file first, binary second.
+
+### Service file conflict detection
+
+pkgtug records the SHA256 of every file it installs. On update it compares:
+
+- **on-disk SHA256** — did the user edit the file since last install?
+- **new SHA256** — does the server have a different version?
+
+If both changed, pkgtug reports a conflict. In an interactive terminal:
+
+```
+⚠  conflict: myapp/systemd
+   /etc/systemd/system/myapp.service was modified locally and a new version is available.
+
+--- current
++++ new
+@@ -5,6 +5,7 @@
+ ExecStart=/usr/local/bin/myapp
++Restart=on-failure
+
+  (u) use new      — overwrite with new version
+  (k) keep current — save new as .pkgtug-new
+  (e) edit         — open $EDITOR, new saved as .pkgtug-new
+  (a) abort        — skip update for this package
+  choice [k]:
+```
+
+In non-interactive mode (cron, daemon): automatically keeps the current file, saves the new version as `<path>.pkgtug-new`, and logs a warning — the update is not blocked.
+
+### Update flow
+
+1. Fetch `manifest.json` from the package's remote
+2. Compare installed version (string equality — works for both tags and SHAs)
+3. Download new file to temp location
+4. Verify SHA256
+5. **Conflict check** — compare on-disk SHA256 to baseline; prompt or auto-resolve
+6. Backup current file to `backup_dir`
+7. Stop service (`systemctl` or `rc-service`, auto-detected at runtime)
+8. Atomic replace (`rename`)
+9. Run `post_install` command if set
+10. Start service
+11. Health check
+12. On failure → restore backup, restart service
 
 ### Cron / systemd timer
 
@@ -259,28 +299,12 @@ pkgtug uninstall --remove-binary myapp/server
 */15 * * * * pkgtug update --all
 ```
 
-No daemon required. When stdout is not a terminal (cron, CI), all TUI output (spinner, progress bar) is automatically replaced with plain log lines. Pinned packages are skipped silently.
-
-### Update flow
-
-1. Fetch `manifest.json` from the package's remote
-2. Compare installed version (string equality — works for both tags and SHAs)
-3. Download binary to temp file
-4. Verify SHA256
-5. Backup current binary to `backup_dir` (only the binary — config files are never touched)
-6. Stop service (`systemctl` or `rc-service`, auto-detected at runtime)
-7. Atomic replace (`rename`)
-8. Start service
-9. Health check (URL or shell command, retried up to 5×)
-10. On failure → restore backup, restart service
+No daemon required. When stdout is not a terminal (cron, CI), all TUI output is replaced with plain log lines and conflicts are auto-resolved non-destructively.
 
 ## Building
 
 ```sh
-# build all three binaries into dist/
-make all
-
-# cross-compile
+make all              # build all three binaries into dist/
 make build-linux-amd64
 make build-linux-arm64
 ```
