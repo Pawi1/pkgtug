@@ -9,7 +9,13 @@ import (
 )
 
 type Config struct {
-	ServerURL string `yaml:"server_url"`
+	ServerURL string          `yaml:"server_url"`
+	Telegram  TelegramSection `yaml:"telegram"`
+}
+
+type TelegramSection struct {
+	BotToken string `yaml:"bot_token"`
+	ChatID   string `yaml:"chat_id"`
 }
 
 func LoadConfig(path string) (*Config, error) {

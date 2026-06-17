@@ -36,6 +36,22 @@ func (t *Telegram) BuildSuccess(pkg, version, platform string) error {
 	return t.send(msg)
 }
 
+func (t *Telegram) UpdateSuccess(key, version string) error {
+	msg := fmt.Sprintf("✅ <b>%s</b> updated to <code>%s</code>",
+		html.EscapeString(key),
+		html.EscapeString(version),
+	)
+	return t.send(msg)
+}
+
+func (t *Telegram) UpdateFailure(key, errMsg string) error {
+	msg := fmt.Sprintf("❌ <b>%s</b> update failed\n<code>%s</code>",
+		html.EscapeString(key),
+		html.EscapeString(errMsg),
+	)
+	return t.send(msg)
+}
+
 func (t *Telegram) BuildFailure(pkg, version, platform, errMsg string) error {
 	msg := fmt.Sprintf("❌ <b>%s</b> build failed\nVersion: <code>%s</code>\nPlatform: <code>%s</code>\n<code>%s</code>",
 		html.EscapeString(pkg),

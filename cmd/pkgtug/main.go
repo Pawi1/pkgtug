@@ -52,12 +52,7 @@ func main() {
 		fatalf("detect platform: %v\n", err)
 	}
 
-	app := &App{
-		cfg:        cfg,
-		statePath:  *statePath,
-		state:      state,
-		platform:   platform,
-	}
+	app := newApp(cfg, *statePath, state, platform)
 
 	switch cmd {
 	case "check":
