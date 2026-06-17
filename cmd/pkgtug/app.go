@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/pawi1/pkgtug/internal/client"
 	"github.com/pawi1/pkgtug/internal/notify"
 	"github.com/pawi1/pkgtug/internal/tui"
@@ -38,13 +36,4 @@ func (a *App) newProgress() client.Progress {
 	return client.PlainProgress{}
 }
 
-// Stubs — implemented in subsequent steps.
-
-func (a *App) cmdStatus(_ []string) error {
-	return fmt.Errorf("not implemented yet")
-}
-
-func (a *App) cmdRollback(_ []string) error {
-	return fmt.Errorf("not implemented yet")
-}
 

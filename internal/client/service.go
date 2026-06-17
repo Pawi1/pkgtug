@@ -26,7 +26,7 @@ func detectInit() initSystem {
 	return initUnknown
 }
 
-func stopService(name string) error {
+func StopService(name string) error {
 	switch detectInit() {
 	case initSystemd:
 		return runCmd("systemctl", "stop", name)
@@ -37,7 +37,7 @@ func stopService(name string) error {
 	}
 }
 
-func startService(name string) error {
+func StartService(name string) error {
 	switch detectInit() {
 	case initSystemd:
 		return runCmd("systemctl", "start", name)

@@ -26,7 +26,7 @@ func Check(cfg *Config, state State, key, platform string) (*CheckResult, error)
 }
 
 func CheckWithProgress(cfg *Config, state State, key, platform string, p Progress) (*CheckResult, error) {
-	pkg, component, err := splitKey(key)
+	pkg, component, err := SplitKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func Update(cfg *Config, state State, key, platform string, p Progress) (bool, e
 		return false, fmt.Errorf("%s: not installed (run pkgtug install first)", key)
 	}
 
-	pkg, component, _ := splitKey(key)
+	pkg, component, _ := SplitKey(key)
 	mf, err := FetchManifest(cfg.ServerURL, pkg)
 	if err != nil {
 		return false, err
@@ -117,14 +117,14 @@ func Update(cfg *Config, state State, key, platform string, p Progress) (bool, e
 	// Stop service
 	if entry.ServiceName != "" {
 		p.Log("%s: stopping service %s", key, entry.ServiceName)
-		if err := stopService(entry.ServiceName); err != nil {
+		if err := StopService(entry.ServiceName); err != nil {
 			return false, fmt.Errorf("stop service: %w", err)
 		}
 	}
 
 	// Atomic replace
 	if err := atomicReplace(tmpFile, entry.BinaryPath); err != nil {
-		startService(entry.ServiceName) // best-effort restart
+		StartService(entry.ServiceName) // best-effort restart
 		return false, fmt.Errorf("replace binary: %w", err)
 	}
 	p.Log("%s: binary replaced", key)
@@ -132,7 +132,7 @@ func Update(cfg *Config, state State, key, platform string, p Progress) (bool, e
 	// Start service
 	if entry.ServiceName != "" {
 		p.Log("%s: starting service %s", key, entry.ServiceName)
-		if err := startService(entry.ServiceName); err != nil {
+		if err := StartService(entry.ServiceName); err != nil {
 			doRollback(entry, backupPath, p)
 			return false, fmt.Errorf("start service: %w", err)
 		}
@@ -167,7 +167,7 @@ func doRollback(entry *InstallEntry, backupPath string, p Progress) {
 		return
 	}
 	if entry.ServiceName != "" {
-		if err := startService(entry.ServiceName); err != nil {
+		if err := StartService(entry.ServiceName); err != nil {
 			p.Log("rollback: start service failed: %v", err)
 		}
 	}
@@ -282,7 +282,7 @@ func healthCheckCmd(command string) error {
 	return nil
 }
 
-func splitKey(key string) (pkg, component string, err error) {
+func SplitKey(key string) (pkg, component string, err error) {
 	parts := strings.SplitN(key, "/", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return "", "", fmt.Errorf("invalid key %q: expected <package>/<component>", key)
