@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pkgtug browser</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f1117;
+    --surface:  #1a1d27;
+    --border:   #2a2d3e;
+    --text:     #e2e4ed;
+    --muted:    #6b7280;
+    --accent:   #6366f1;
+    --accent2:  #818cf8;
+    --green:    #34d399;
+    --yellow:   #fbbf24;
+    --red:      #f87171;
+    --radius:   8px;
+    --mono:     'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent2);
+    white-space: nowrap;
+  }
+
+  #server-form {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    max-width: 600px;
+  }
+
+  #server-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: var(--mono);
+    outline: none;
+    transition: border-color .15s;
+  }
+  #server-input:focus { border-color: var(--accent); }
+
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity .15s;
+  }
+  button:hover { opacity: .85; }
+  button.secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  button.copy-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+  button.copy-btn:hover { color: var(--text); border-color: var(--accent); }
+
+  main { padding: 24px; max-width: 960px; margin: 0 auto; }
+
+  #status {
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    font-size: 13px;
+    display: none;
+  }
+  #status.error   { background: #2d1a1a; border: 1px solid var(--red);    color: var(--red); display: block; }
+  #status.info    { background: #1a1f2d; border: 1px solid var(--accent);  color: var(--accent2); display: block; }
+  #status.success { background: #1a2d24; border: 1px solid var(--green);   color: var(--green); display: block; }
+
+  #pkg-count { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+
+  .pkg-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+
+  .pkg-header {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    cursor: pointer;
+    gap: 12px;
+    user-select: none;
+  }
+  .pkg-header:hover { background: rgba(99,102,241,.05); }
+
+  .pkg-name {
+    font-weight: 600;
+    font-size: 15px;
+    flex: 1;
+  }
+
+  .version-badge {
+    background: rgba(99,102,241,.15);
+    color: var(--accent2);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .version-badge.none { background: rgba(107,114,128,.1); color: var(--muted); }
+
+  .chevron {
+    color: var(--muted);
+    font-size: 12px;
+    transition: transform .2s;
+  }
+  .pkg-card.open .chevron { transform: rotate(90deg); }
+
+  .pkg-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 16px;
+  }
+  .pkg-card.open .pkg-body { display: block; }
+
+  .component + .component { margin-top: 20px; }
+
+  .component-name {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .platform-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .platform-row:last-child { border-bottom: none; }
+
+  .platform-tag {
+    background: rgba(52,211,153,.1);
+    color: var(--green);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    min-width: 110px;
+  }
+
+  .sha-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .row-actions { display: flex; gap: 6px; }
+
+  .push-section {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .push-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .push-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .push-form input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: var(--mono);
+    outline: none;
+  }
+  .push-form input:focus { border-color: var(--accent); }
+
+  .curl-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-all;
+    position: relative;
+  }
+  .curl-block .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 600px) {
+    header { flex-wrap: wrap; }
+    .push-form { grid-template-columns: 1fr; }
+    .platform-row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚓ pkgtug</h1>
+  <form id="server-form" onsubmit="return false">
+    <input id="server-input" type="url" placeholder="https://tug.example.com" autocomplete="off" spellcheck="false">
+    <button onclick="connect()">Connect</button>
+  </form>
+  <button class="secondary" onclick="refresh()" title="Refresh">↻</button>
+</header>
+
+<main>
+  <div id="status"></div>
+  <div id="pkg-count"></div>
+  <div id="pkg-list"></div>
+</main>
+
+<script>
+'use strict';
+
+let serverURL = '';
+
+// ── init ──────────────────────────────────────────────────────────────────────
+
+(function init() {
+  const params = new URLSearchParams(location.search);
+  const s = params.get('server') || localStorage.getItem('pkgtug_server') || '';
+  document.getElementById('server-input').value = s;
+  if (s) { serverURL = s.replace(/\/$/, ''); loadPackages(); }
+})();
+
+// ── connect ───────────────────────────────────────────────────────────────────
+
+function connect() {
+  const raw = document.getElementById('server-input').value.trim().replace(/\/$/, '');
+  if (!raw) return;
+  serverURL = raw;
+  localStorage.setItem('pkgtug_server', serverURL);
+  const url = new URL(location.href);
+  url.searchParams.set('server', serverURL);
+  history.replaceState(null, '', url);
+  loadPackages();
+}
+
+function refresh() { if (serverURL) loadPackages(); }
+
+// ── fetch helpers ─────────────────────────────────────────────────────────────
+
+async function apiFetch(path) {
+  const r = await fetch(serverURL + path);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+// ── load packages ─────────────────────────────────────────────────────────────
+
+async function loadPackages() {
+  setStatus('info', '<span class="spinner"></span>  Connecting to ' + esc(serverURL) + ' …');
+  document.getElementById('pkg-list').innerHTML = '';
+  document.getElementById('pkg-count').textContent = '';
+
+  let pkgs;
+  try {
+    pkgs = await apiFetch('/tug/packages');
+  } catch (e) {
+    setStatus('error', 'Could not reach server: ' + esc(e.message));
+    return;
+  }
+
+  if (!pkgs || pkgs.length === 0) {
+    setStatus('info', 'Connected — no packages configured on this server.');
+    return;
+  }
+
+  setStatus('success', 'Connected to ' + esc(serverURL));
+  document.getElementById('pkg-count').textContent =
+    pkgs.length + ' package' + (pkgs.length !== 1 ? 's' : '');
+
+  const list = document.getElementById('pkg-list');
+  for (const pkg of pkgs) {
+    list.appendChild(buildCard(pkg));
+  }
+}
+
+// ── package card ──────────────────────────────────────────────────────────────
+
+function buildCard(pkg) {
+  const card = el('div', 'pkg-card');
+  card.id = 'card-' + pkg.name;
+
+  const header = el('div', 'pkg-header');
+  header.onclick = () => toggleCard(card, pkg.name);
+
+  const name = el('div', 'pkg-name');
+  name.textContent = pkg.name;
+
+  const badge = el('span', 'version-badge' + (pkg.version ? '' : ' none'));
+  badge.textContent = pkg.version || 'no build yet';
+
+  const chev = el('span', 'chevron');
+  chev.textContent = '▶';
+
+  header.append(name, badge, chev);
+  card.appendChild(header);
+
+  const body = el('div', 'pkg-body');
+  body.id = 'body-' + pkg.name;
+  body.innerHTML = '<span class="spinner"></span>';
+  card.appendChild(body);
+
+  return card;
+}
+
+async function toggleCard(card, name) {
+  const isOpen = card.classList.contains('open');
+  if (isOpen) { card.classList.remove('open'); return; }
+  card.classList.add('open');
+
+  const body = document.getElementById('body-' + name);
+  if (body.dataset.loaded) return;
+
+  let mf;
+  try {
+    mf = await apiFetch('/tug/repo/' + name + '/manifest.json');
+  } catch (e) {
+    body.innerHTML = '<span style="color:var(--red)">Failed to load manifest: ' + esc(e.message) + '</span>';
+    return;
+  }
+
+  body.dataset.loaded = '1';
+  body.innerHTML = '';
+
+  const components = Object.keys(mf.binaries || {}).sort();
+  if (components.length === 0) {
+    body.innerHTML = '<span style="color:var(--muted)">No binaries in manifest.</span>';
+    return;
+  }
+
+  for (const comp of components) {
+    const section = el('div', 'component');
+    const compTitle = el('div', 'component-name');
+    compTitle.textContent = comp;
+    section.appendChild(compTitle);
+
+    const platforms = Object.keys(mf.binaries[comp]).sort();
+    for (const plat of platforms) {
+      const bin = mf.binaries[comp][plat];
+      const row = el('div', 'platform-row');
+
+      const tag = el('span', 'platform-tag');
+      tag.textContent = plat;
+
+      const sha = el('span', 'sha-text');
+      sha.title = bin.sha256;
+      sha.textContent = 'sha256: ' + bin.sha256.slice(0, 16) + '…';
+
+      const actions = el('div', 'row-actions');
+
+      const dlBtn = el('button', '');
+      dlBtn.textContent = 'Download';
+      dlBtn.onclick = () => window.open(bin.url, '_blank');
+
+      const copyBtn = el('button', 'copy-btn');
+      copyBtn.textContent = 'Copy URL';
+      copyBtn.onclick = () => copyText(bin.url, copyBtn);
+
+      actions.append(dlBtn, copyBtn);
+      row.append(tag, sha, actions);
+      section.appendChild(row);
+    }
+    body.appendChild(section);
+  }
+
+  // Push helper
+  const pushSection = el('div', 'push-section');
+  const pushLabel = el('div', 'push-label');
+  pushLabel.textContent = 'Direct push (AppImage / pre-built binary)';
+  pushSection.appendChild(pushLabel);
+
+  const firstComp = components[0];
+  const pushForm = el('div', 'push-form');
+
+  const vInput = el('input', ''); vInput.placeholder = 'version (e.g. 1.2.3)'; vInput.id = 'pv-' + name;
+  const pInput = el('input', ''); pInput.placeholder = 'platform (e.g. linux-x64)'; pInput.id = 'pp-' + name;
+  const cInput = el('input', ''); cInput.placeholder = 'component'; cInput.value = firstComp; cInput.id = 'pc-' + name;
+
+  pushForm.append(vInput, pInput, cInput);
+
+  const curlBlock = el('div', 'curl-block');
+  curlBlock.id = 'curl-' + name;
+
+  function updateCurl() {
+    const v = vInput.value || '<version>';
+    const p = pInput.value || '<platform>';
+    const c = cInput.value || '<component>';
+    const snippet =
+`curl -X POST ${serverURL}/tug/repo/${name}/push \\
+  -H "Authorization: Bearer $PKGTUG_SECRET" \\
+  -F "version=${v}" \\
+  -F "platform=${p}" \\
+  -F "component=${c}" \\
+  -F "file=@/path/to/binary"`;
+
+    const copyBtnEl = curlBlock.querySelector('.copy-btn');
+    curlBlock.textContent = snippet;
+    if (copyBtnEl) curlBlock.appendChild(copyBtnEl);
+  }
+
+  [vInput, pInput, cInput].forEach(i => i.addEventListener('input', updateCurl));
+
+  const copyBtnCurl = el('button', 'copy-btn');
+  copyBtnCurl.textContent = 'Copy';
+  copyBtnCurl.onclick = () => copyText(curlBlock.textContent.replace(/\s*Copy\s*$/, ''), copyBtnCurl);
+  curlBlock.appendChild(copyBtnCurl);
+
+  pushSection.append(pushForm, curlBlock);
+  body.appendChild(pushSection);
+  updateCurl();
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function el(tag, cls) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  return e;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function setStatus(type, html) {
+  const s = document.getElementById('status');
+  s.className = type;
+  s.innerHTML = html;
+}
+
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  } catch (_) {}
+}
+</script>
+
+</body>
+</html>
