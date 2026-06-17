@@ -2,7 +2,9 @@ package gitops
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -44,6 +46,25 @@ func BranchSHA(localClone, branchName string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+// EnsureClone clones gitURL into localDir if it doesn't exist, otherwise fetches.
+func EnsureClone(gitURL, localDir string) error {
+	if _, err := os.Stat(filepath.Join(localDir, ".git")); os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(localDir), 0o755); err != nil {
+			return err
+		}
+		return run("", "clone", "--filter=blob:none", gitURL, localDir)
+	}
+	return run(localDir, "fetch", "--all", "--tags", "--prune", "--prune-tags")
+}
+
+// Checkout checks out the given ref (tag, branch, or SHA) with a clean working tree.
+func Checkout(localDir, ref string) error {
+	if err := run(localDir, "checkout", "--detach", ref); err != nil {
+		return err
+	}
+	return run(localDir, "clean", "-fdx")
 }
 
 func run(dir string, args ...string) error {
