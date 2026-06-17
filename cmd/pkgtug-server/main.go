@@ -14,6 +14,7 @@ import (
 
 	"github.com/pawi1/pkgtug/internal/config"
 	"github.com/pawi1/pkgtug/internal/server"
+	"github.com/pawi1/pkgtug/internal/worker"
 )
 
 var version = "dev"
@@ -30,10 +31,16 @@ const exampleConfig = `server:
   base_url: "https://tug.example.com"
   data_dir: "./data"
   worker_secret: "change-me"
-  cors_origins:
-    - "*"
+# cors_origins:
+#   - "*"
   webhook_cooldown: "10s"
   # max_upload_size: "100MB"
+
+# worker: run a local build worker inside the server process
+# worker:
+#   enabled: true
+#   work_dir: "./worker-work"
+#   interval: "30s"
 
 # telegram:
 #   bot_token: ""
@@ -80,6 +87,25 @@ func main() {
 	log.Printf("pkgtug-server %s: initialising packages", version)
 	srv.Init(ctx)
 	srv.StartPolling(ctx)
+
+	if cfg.Worker.Enabled {
+		plat, err := worker.PlatformFromUname()
+		if err != nil {
+			log.Fatalf("worker: auto-detect platform: %v", err)
+		}
+		if err := os.MkdirAll(cfg.Worker.WorkDir, 0o755); err != nil {
+			log.Fatalf("worker: work-dir: %v", err)
+		}
+		wcfg := worker.Config{
+			ServerURL: "http://localhost" + cfg.Server.Listen,
+			Secret:    cfg.Server.WorkerSecret,
+			Platform:  plat,
+			WorkDir:   cfg.Worker.WorkDir,
+			Interval:  cfg.Worker.Interval,
+		}
+		log.Printf("pkgtug-worker: starting (platform=%s, interval=%s)", plat, cfg.Worker.Interval)
+		go worker.Run(ctx, wcfg)
+	}
 
 	log.Printf("pkgtug-server %s listening on %s", version, cfg.Server.Listen)
 	httpSrv := &http.Server{

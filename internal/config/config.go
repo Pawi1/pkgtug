@@ -11,8 +11,15 @@ import (
 
 type ServerConfig struct {
 	Server   ServerSection   `yaml:"server"`
+	Worker   WorkerSection   `yaml:"worker"`
 	Telegram TelegramSection `yaml:"telegram"`
 	Packages []Package       `yaml:"packages"`
+}
+
+type WorkerSection struct {
+	Enabled  bool          `yaml:"enabled"`
+	WorkDir  string        `yaml:"work_dir"`
+	Interval time.Duration `yaml:"interval"`
 }
 
 type ServerSection struct {
@@ -136,4 +143,10 @@ func (c *ServerConfig) applyDefaults() {
 		c.Server.WebhookCooldown = 10 * time.Second
 	}
 	c.Server.BaseURL = strings.TrimRight(c.Server.BaseURL, "/")
+	if c.Worker.Enabled && c.Worker.WorkDir == "" {
+		c.Worker.WorkDir = "./worker-work"
+	}
+	if c.Worker.Enabled && c.Worker.Interval <= 0 {
+		c.Worker.Interval = 30 * time.Second
+	}
 }
