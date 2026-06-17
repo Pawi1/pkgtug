@@ -98,6 +98,7 @@ func (s *Server) handleBuildResult(w http.ResponseWriter, r *http.Request) {
 		}
 		s.states[job.PackageName].completeJob(job.Platform, job.Version)
 		s.jobs.delete(jobID)
+		s.persistState()
 		log.Printf("build result %s [%s %s %s]: OK", jobID, job.PackageName, job.Version, job.Platform)
 		if err := s.tg.BuildSuccess(job.PackageName, job.Version, job.Platform); err != nil {
 			log.Printf("telegram notify: %v", err)

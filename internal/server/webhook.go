@@ -37,6 +37,7 @@ func (s *Server) handleFetch(w http.ResponseWriter, r *http.Request) {
 		state := s.states[name]
 		if changed := state.setVersion(version); changed {
 			log.Printf("fetch %s: new version detected: %s", name, version)
+			s.persistState()
 		} else {
 			log.Printf("fetch %s: version unchanged: %s", name, version)
 		}

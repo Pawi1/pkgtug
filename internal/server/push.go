@@ -62,8 +62,10 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Also update the in-memory version so workers and clients see the new version.
+	// Update in-memory version and persist.
 	s.states[name].setVersion(version)
+	s.states[name].completeJob(platform, version)
+	s.persistState()
 
 	log.Printf("push %s [%s %s %s]: OK", name, version, platform, component)
 
