@@ -15,10 +15,11 @@ type ServerConfig struct {
 }
 
 type ServerSection struct {
-	Listen       string `yaml:"listen"`
-	BaseURL      string `yaml:"base_url"`
-	DataDir      string `yaml:"data_dir"`
-	WorkerSecret string `yaml:"worker_secret"`
+	Listen       string   `yaml:"listen"`
+	BaseURL      string   `yaml:"base_url"`
+	DataDir      string   `yaml:"data_dir"`
+	WorkerSecret string   `yaml:"worker_secret"`
+	CORSOrigins  []string `yaml:"cors_origins"` // e.g. ["*"] or ["https://user.github.io"]
 }
 
 type TelegramSection struct {

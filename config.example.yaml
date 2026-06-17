@@ -3,6 +3,9 @@ server:
   base_url: "https://tug.internal.example.com"
   data_dir: "/var/lib/pkgtug"
   worker_secret: "change-me-to-a-random-secret"
+  cors_origins:
+    - "*"   # allow all origins (required for GitHub Pages browser UI)
+    # or restrict: - "https://youruser.github.io"
 
 telegram:
   bot_token: ""

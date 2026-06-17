@@ -46,7 +46,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /tug/repo/{name}/push", s.handlePush)
 	mux.HandleFunc("GET /tug/build/next", s.handleBuildNext)
 	mux.HandleFunc("POST /tug/build/{job_id}/result", s.handleBuildResult)
-	return mux
+	return s.corsMiddleware(mux)
 }
 
 func (s *Server) packageMu(name string) *sync.Mutex {
