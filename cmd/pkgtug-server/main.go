@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/pawi1/pkgtug/internal/config"
 	"github.com/pawi1/pkgtug/internal/server"
@@ -34,7 +35,12 @@ func main() {
 	srv.StartPolling(ctx)
 
 	log.Printf("pkgtug-server %s listening on %s", version, cfg.Server.Listen)
-	httpSrv := &http.Server{Addr: cfg.Server.Listen, Handler: srv.Handler()}
+	httpSrv := &http.Server{
+		Addr:              cfg.Server.Listen,
+		Handler:           srv.Handler(),
+		ReadHeaderTimeout: 30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 
 	go func() {
 		<-ctx.Done()

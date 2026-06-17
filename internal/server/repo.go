@@ -40,9 +40,16 @@ func (s *Server) handleBinaryDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, seg := range []string{version, platform, component} {
+		if err := validPathComponent(seg); err != nil {
+			http.Error(w, "invalid path: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	binPath := filepath.Join(s.cfg.Server.DataDir, "packages", name, version, platform, component)
-	// filepath.Clean is implicit in http.ServeFile, but validate no traversal manually.
-	if !filepath.IsAbs(binPath) {
+	pkgRoot := filepath.Join(s.cfg.Server.DataDir, "packages", name)
+	if err := underRoot(pkgRoot, binPath); err != nil {
 		http.Error(w, "bad path", http.StatusBadRequest)
 		return
 	}

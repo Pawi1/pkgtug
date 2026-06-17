@@ -150,7 +150,28 @@ func runBuild(ctx context.Context, dir, command string) error {
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	// Strip worker credentials from the build environment so build scripts
+	// and checked-out source cannot read the bearer secret.
+	cmd.Env = scrubEnv(os.Environ(), "PKGTUG_SECRET", "PKGTUG_SERVER")
 	return cmd.Run()
+}
+
+// scrubEnv returns a copy of env with the named variables removed.
+func scrubEnv(env []string, keys ...string) []string {
+	out := make([]string, 0, len(env))
+	for _, e := range env {
+		keep := true
+		for _, k := range keys {
+			if strings.HasPrefix(e, k+"=") {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func postSuccess(ctx context.Context, client *http.Client, cfg Config, j *job, cloneDir string) error {

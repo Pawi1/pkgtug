@@ -125,7 +125,17 @@ func (s *Server) storeBuildResult(job *Job, r *http.Request) error {
 
 // storeBinary saves one binary file and updates the package manifest atomically.
 func (s *Server) storeBinary(pkgName, version, platform, component string, src io.Reader) error {
-	pkgDir := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName, version, platform)
+	for _, seg := range []string{version, platform, component} {
+		if err := validPathComponent(seg); err != nil {
+			return fmt.Errorf("invalid upload field: %w", err)
+		}
+	}
+
+	pkgRoot := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName)
+	pkgDir := filepath.Join(pkgRoot, version, platform)
+	if err := underRoot(pkgRoot, filepath.Join(pkgDir, component)); err != nil {
+		return fmt.Errorf("path traversal detected: %w", err)
+	}
 	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
 		return err
 	}
