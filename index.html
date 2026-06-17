@@ -326,7 +326,7 @@
 <header>
   <h1>⚓ pkgtug</h1>
   <form id="server-form" onsubmit="return false">
-    <input id="server-input" type="url" placeholder="https://tug.example.com" autocomplete="off" spellcheck="false">
+    <input id="server-input" type="url" placeholder="https://tug.rutkow.eu" autocomplete="off" spellcheck="false">
     <button onclick="connect()">Connect</button>
   </form>
   <button class="secondary" onclick="refresh()" title="Refresh">↻</button>
@@ -348,7 +348,7 @@ let serverURL = '';
 
 (function init() {
   const params = new URLSearchParams(location.search);
-  const s = params.get('server') || localStorage.getItem('pkgtug_server') || '';
+  const s = params.get('server') || localStorage.getItem('pkgtug_server') || 'https://tug.rutkow.eu';
   document.getElementById('server-input').value = s;
   if (s) { serverURL = s.replace(/\/$/, ''); loadPackages(); }
 })();
@@ -482,7 +482,10 @@ async function toggleCard(card, name) {
   try {
     mf = await apiFetch('/tug/repo/' + name + '/manifest.json');
   } catch (e) {
-    body.innerHTML = '<span style="color:var(--red)">Failed to load manifest: ' + esc(e.message) + '</span>';
+    const is404 = e.message.includes('404');
+    body.innerHTML = '<span style="color:' + (is404 ? 'var(--yellow)' : 'var(--red)') + '">'
+      + (is404 ? '⏳ no build available yet — worker has not finished the first build' : 'Failed to load manifest: ' + esc(e.message))
+      + '</span>';
     return;
   }
 
