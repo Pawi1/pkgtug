@@ -193,11 +193,16 @@ Remotes are stored in `/etc/pkgtug/config.yaml` and managed by the CLI.
 ### Usage
 
 ```sh
-# search / install
+# search / install from pkgtug server
 pkgtug search myapp
 pkgtug install myapp/server               # auto-discovers remote
 pkgtug install main:myapp/server          # explicit remote
 pkgtug install --autoupdate myapp/server  # mark for daemon auto-update
+
+# install from GitHub Releases
+pkgtug install github:cli/cli             # auto-detects asset for current platform
+pkgtug install github:cli/cli/gh          # filter assets by name hint
+pkgtug install --autoupdate github:cli/cli
 
 # update
 pkgtug update myapp/server
@@ -221,6 +226,26 @@ pkgtug rollback myapp/server
 pkgtug uninstall myapp/server
 pkgtug uninstall --remove-binary myapp/server
 ```
+
+### GitHub Releases source
+
+pkgtug can install and update binaries directly from GitHub Releases — no pkgtug server needed for these packages.
+
+```sh
+pkgtug install github:cli/cli
+pkgtug install github:goreleaser/goreleaser/goreleaser
+```
+
+Asset selection:
+- pkgtug tries to **auto-detect** the right asset based on OS and architecture (`linux-amd64`, `darwin-arm64`, etc.)
+- If the match is ambiguous, an **interactive picker** is shown
+- A name hint (`github:owner/repo/hint`) narrows the list before matching
+
+Checksum verification is automatic when the release includes a companion file (`checksums.txt`, `SHA256SUMS`, `<asset>.sha256`, etc.).
+
+Set `GITHUB_TOKEN` in the environment for private repositories and higher API rate limits (5000 req/h vs 60).
+
+GitHub-sourced packages are stored in state alongside pkgtug-server packages. `pkgtug update --all`, `pkgtug check`, and `pkgtug daemon` handle both source types transparently.
 
 ### Interactive install
 
@@ -316,6 +341,7 @@ Requires Go 1.22+. Produces fully static binaries.
 - The webhook endpoint has **no authentication** — it only runs `git fetch` on a local clone. Safe to expose publicly. Repeated calls within the cooldown window are rate-limited (default 10 s).
 - Worker endpoints require `Authorization: Bearer <worker_secret>`. Workers write data that is later served to all clients, so they must be trusted.
 - Client endpoints (manifest, binary download) have **no authentication** — treat them like a package mirror.
+- GitHub Releases downloads go directly to `github.com` / `objects.githubusercontent.com`. Set `GITHUB_TOKEN` to authenticate private repos. Checksums are verified automatically when provided by the release.
 
 ## License
 
