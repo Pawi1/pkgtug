@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -34,6 +35,7 @@ type Package struct {
 	VersionSource VersionSource `yaml:"version_source"`
 	BuildCommand  string        `yaml:"build_command"`
 	Binaries      []Binary      `yaml:"binaries"`
+	PollInterval  time.Duration `yaml:"poll_interval"` // 0 = disabled; e.g. "5m"
 }
 
 type VersionSource struct {

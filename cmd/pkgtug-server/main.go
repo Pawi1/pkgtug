@@ -31,6 +31,7 @@ func main() {
 
 	log.Printf("pkgtug-server %s: initialising packages", version)
 	srv.Init(ctx)
+	srv.StartPolling(ctx)
 
 	log.Printf("pkgtug-server %s listening on %s", version, cfg.Server.Listen)
 	httpSrv := &http.Server{Addr: cfg.Server.Listen, Handler: srv.Handler()}

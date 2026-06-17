@@ -19,6 +19,7 @@ packages:
       type: tag
       pattern: "*-stable"
     build_command: "make build-binary"
+    poll_interval: "5m"   # optional: check for new versions every 5 min (backup for missed webhooks)
     binaries:
       - component: mcp
         path: mcp/dist/vcn-mcp
