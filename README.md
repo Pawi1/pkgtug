@@ -178,8 +178,6 @@ telegram:          # optional — leave empty to disable
   chat_id: ""
 ```
 
-> **Migration:** the legacy `server_url` key is still accepted and is automatically treated as a remote named `"default"`.
-
 ### Usage
 
 ```sh
