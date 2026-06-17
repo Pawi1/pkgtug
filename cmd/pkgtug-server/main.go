@@ -30,7 +30,9 @@ const exampleConfig = `server:
   base_url: "https://tug.example.com"
   data_dir: "./data"
   worker_secret: "change-me"
-  webhook_cooldown: 10s
+  cors_origins:
+    - "*"
+  webhook_cooldown: "10s"
   # max_upload_size: "100MB"
 
 # telegram:
@@ -48,7 +50,7 @@ packages:
     binaries:
       - component: myapp
         path: myapp
-    poll_interval: 5m
+    poll_interval: "5m"
     # compress: xz
 `
 
