@@ -126,26 +126,56 @@ The workflow triggers on every push, so it runs in parallel with the webhook —
 
 ## Client (`pkgtug`)
 
+### Remotes
+
+pkgtug supports multiple package servers (remotes), similar to Flatpak. Each remote is a named pkgtug-server instance.
+
+```sh
+# add a server
+pkgtug remote add main    https://tug.example.com
+pkgtug remote add nightly https://tug-nightly.example.com
+
+# list configured servers
+pkgtug remote list
+
+# remove a server
+pkgtug remote remove nightly
+```
+
+Remotes are stored in `/etc/pkgtug/config.yaml`. The file is managed by the CLI — no manual editing required.
+
 ### Configuration
 
-`/etc/pkgtug/config.yaml`:
+`/etc/pkgtug/config.yaml` (managed by `pkgtug remote`):
 
 ```yaml
-server_url: https://tug.example.com
+remotes:
+  - name: main
+    url: https://tug.example.com
+  - name: community
+    url: https://tug.community.example.com
 
-telegram:          # optional
+telegram:          # optional — leave empty to disable
   bot_token: ""
   chat_id: ""
 ```
 
+> **Migration:** the legacy `server_url` key is still accepted and is automatically treated as a remote named `"default"`.
+
 ### Usage
 
 ```sh
-# discover what's available
+# search across all remotes
 pkgtug search myapp
 
-# install (interactive — prompts for path, service name, health check, backup dir)
+# search a specific remote
+pkgtug search --remote community myapp
+
+# install — auto-discovers which remote has the package
 pkgtug install myapp/server
+
+# install from a specific remote
+pkgtug install main:myapp/server
 
 # check for update
 pkgtug check myapp/server
@@ -153,15 +183,17 @@ pkgtug check myapp/server
 # update one package
 pkgtug update myapp/server
 
-# update all
+# update everything installed
 pkgtug update --all
 
-# show installed packages
+# show installed packages (includes remote column)
 pkgtug status
 
 # restore previous binary from backup
 pkgtug rollback myapp/server
 ```
+
+`install` is interactive: it prompts for binary path, service name (for stop/start during updates), health check URL or command, and backup directory. All prompts except the path have defaults or can be skipped with Enter.
 
 ### Cron / systemd timer
 
@@ -169,19 +201,19 @@ pkgtug rollback myapp/server
 */15 * * * * pkgtug update --all
 ```
 
-No daemon required. When not running in a terminal, all TUI output (spinner, progress bar) is automatically replaced with plain log lines.
+No daemon required. When stdout is not a terminal (cron, CI), all TUI output (spinner, progress bar) is automatically replaced with plain log lines.
 
 ### Update flow
 
-1. Fetch `manifest.json` from server
+1. Fetch `manifest.json` from the package's remote
 2. Compare installed version (string equality — works for both tags and SHAs)
 3. Download binary to temp file
 4. Verify SHA256
-5. Backup current binary to `backup_dir` (only the binary, not config files)
-6. Stop service (`systemctl` or `rc-service`, auto-detected)
+5. Backup current binary to `backup_dir` (only the binary — config files are never touched)
+6. Stop service (`systemctl` or `rc-service`, auto-detected at runtime)
 7. Atomic replace (`rename`)
 8. Start service
-9. Health check (URL or shell command, with retries)
+9. Health check (URL or shell command, retried up to 5×)
 10. On failure → restore backup, restart service
 
 ## Building
