@@ -1,0 +1,57 @@
+# pkgtug worker via GitHub Actions
+#
+# Copy this file to .github/workflows/pkgtug-build.yml in your project repo.
+#
+# Required GitHub secrets:
+#   PKGTUG_SERVER  — base URL of your pkgtug-server, e.g. https://tug.internal.example.com
+#   PKGTUG_SECRET  — worker_secret from your server config
+#
+# Required GitHub variable (Settings → Variables):
+#   PKGTUG_PLATFORM — platform string, e.g. linux-x64 (can also be set per-workflow below)
+#
+# How it works:
+#   1. On every push, GitHub fires your pkgtug-server webhook (POST /tug/fetch/<name>)
+#      — configure it in GitHub Settings → Webhooks, URL: https://<server>/tug/fetch/<name>
+#   2. This workflow starts at the same time and runs pkgtug-worker --once --wait 90s.
+#      The wait window covers the race between the webhook and Actions startup.
+#   3. Exit 2 (no pending jobs) is treated as success — nothing to build for this push.
+
+name: pkgtug build
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Platform override (leave empty to use PKGTUG_PLATFORM variable)"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install pkgtug-worker
+        run: go install github.com/pawi1/pkgtug/cmd/pkgtug-worker@latest
+
+      - name: Run worker
+        env:
+          PKGTUG_SERVER: ${{ secrets.PKGTUG_SERVER }}
+          PKGTUG_SECRET: ${{ secrets.PKGTUG_SECRET }}
+          PKGTUG_PLATFORM: ${{ inputs.platform || vars.PKGTUG_PLATFORM || 'linux-x64' }}
+        run: |
+          pkgtug-worker \
+            --server   "$PKGTUG_SERVER" \
+            --secret   "$PKGTUG_SECRET" \
+            --platform "$PKGTUG_PLATFORM" \
+            --once \
+            --wait 90s
+          code=$?
+          # exit 2 = no pending jobs — not an error
+          [ "$code" -eq 2 ] && exit 0 || exit "$code"

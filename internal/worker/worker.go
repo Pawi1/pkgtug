@@ -38,6 +38,10 @@ type job struct {
 	Binaries     []config.Binary `json:"binaries"`
 }
 
+// ErrNoJob is returned by RunOnce when the server has no pending jobs.
+var ErrNoJob = fmt.Errorf("no pending jobs")
+
+// Run polls indefinitely until ctx is cancelled.
 func Run(ctx context.Context, cfg Config) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	log.Printf("worker: polling %s (platform=%s, interval=%s)", cfg.ServerURL, cfg.Platform, cfg.Interval)
@@ -53,31 +57,71 @@ func Run(ctx context.Context, cfg Config) {
 	}
 }
 
-func poll(ctx context.Context, client *http.Client, cfg Config) error {
+// RunOnce polls once (retrying until waitFor elapses if no job is available yet).
+// Returns ErrNoJob if the server had nothing to build after the wait window.
+func RunOnce(ctx context.Context, cfg Config, waitFor time.Duration) error {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	deadline := time.Now().Add(waitFor)
+	retryInterval := 10 * time.Second
+
+	for {
+		found, err := pollOnce(ctx, client, cfg)
+		if err != nil {
+			return err
+		}
+		if found {
+			return nil
+		}
+		// No job yet — wait and retry if within window.
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return ErrNoJob
+		}
+		sleep := retryInterval
+		if sleep > remaining {
+			sleep = remaining
+		}
+		log.Printf("worker: no job yet, retrying in %s (%.0fs remaining)", sleep, remaining.Seconds())
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(sleep):
+		}
+	}
+}
+
+// pollOnce does a single GET /tug/build/next. Returns (jobFound, error).
+func pollOnce(ctx context.Context, client *http.Client, cfg Config) (bool, error) {
 	url := cfg.ServerURL + "/tug/build/next?platform=" + cfg.Platform
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Authorization", "Bearer "+cfg.Secret)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNoContent {
-		return nil // no pending jobs
+		return false, nil
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status %d", resp.StatusCode)
+		return false, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
 	var j job
 	if err := json.NewDecoder(resp.Body).Decode(&j); err != nil {
-		return fmt.Errorf("decode job: %w", err)
+		return false, fmt.Errorf("decode job: %w", err)
 	}
 
 	log.Printf("worker: got job %s — %s %s", j.ID, j.PackageName, j.Version)
-	return runJob(ctx, client, cfg, &j)
+	return true, runJob(ctx, client, cfg, &j)
+}
+
+func poll(ctx context.Context, client *http.Client, cfg Config) error {
+	_, err := pollOnce(ctx, client, cfg)
+	return err
 }
 
 func runJob(ctx context.Context, client *http.Client, cfg Config, j *job) error {

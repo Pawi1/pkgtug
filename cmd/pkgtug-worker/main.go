@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -19,7 +20,9 @@ func main() {
 	secret := flag.String("secret", "", "worker shared secret (required)")
 	platform := flag.String("platform", "", "platform string, e.g. linux-x64 (auto-detected if empty)")
 	workDir := flag.String("work-dir", "/var/cache/pkgtug-worker", "directory for git clones and builds")
-	interval := flag.Duration("interval", 30*time.Second, "poll interval")
+	interval := flag.Duration("interval", 30*time.Second, "poll interval (daemon mode)")
+	once := flag.Bool("once", false, "build one job and exit (for CI/GitHub Actions)")
+	wait := flag.Duration("wait", 0, "in --once mode: keep retrying for this long if no job is ready yet (e.g. 60s)")
 	flag.Parse()
 
 	if *serverURL == "" || *secret == "" {
@@ -44,11 +47,26 @@ func main() {
 	defer stop()
 
 	log.Printf("pkgtug-worker %s", version)
-	worker.Run(ctx, worker.Config{
+
+	cfg := worker.Config{
 		ServerURL: *serverURL,
 		Secret:    *secret,
 		Platform:  plat,
 		WorkDir:   *workDir,
 		Interval:  *interval,
-	})
+	}
+
+	if *once {
+		err := worker.RunOnce(ctx, cfg, *wait)
+		if errors.Is(err, worker.ErrNoJob) {
+			log.Println("worker: no pending jobs — exiting")
+			os.Exit(2)
+		}
+		if err != nil {
+			log.Fatalf("worker: %v", err)
+		}
+		return
+	}
+
+	worker.Run(ctx, cfg)
 }
