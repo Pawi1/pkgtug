@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 
 	"github.com/pawi1/pkgtug/internal/client"
+	"github.com/pawi1/pkgtug/internal/tui"
 )
 
 func (a *App) cmdUpdate(args []string) error {
@@ -22,15 +22,23 @@ func (a *App) cmdUpdate(args []string) error {
 	return a.updateOne(fs.Arg(0))
 }
 
+func (a *App) newProgress() client.Progress {
+	if tui.IsTerminal() {
+		return tui.New()
+	}
+	return client.PlainProgress{}
+}
+
 func (a *App) updateOne(key string) error {
-	updated, err := client.Update(a.cfg, a.state, key, a.platform, log.Printf)
+	p := a.newProgress()
+	updated, err := client.Update(a.cfg, a.state, key, a.platform, p)
 	if err != nil {
 		a.tg.UpdateFailure(key, err.Error())
 		return err
 	}
 	if updated {
 		if err := a.saveState(); err != nil {
-			log.Printf("save state: %v", err)
+			p.Log("save state: %v", err)
 		}
 		a.tg.UpdateSuccess(key, a.state[key].InstalledVersion)
 	}
@@ -39,9 +47,10 @@ func (a *App) updateOne(key string) error {
 
 func (a *App) updateAll() error {
 	var lastErr error
+	p := a.newProgress()
 	for key := range a.state {
 		if err := a.updateOne(key); err != nil {
-			log.Printf("update %s: %v", key, err)
+			p.Log("update %s: %v", key, err)
 			lastErr = err
 		}
 	}

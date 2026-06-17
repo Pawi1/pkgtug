@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -23,6 +22,10 @@ type CheckResult struct {
 }
 
 func Check(cfg *Config, state State, key, platform string) (*CheckResult, error) {
+	return CheckWithProgress(cfg, state, key, platform, PlainProgress{})
+}
+
+func CheckWithProgress(cfg *Config, state State, key, platform string, p Progress) (*CheckResult, error) {
 	pkg, component, err := splitKey(key)
 	if err != nil {
 		return nil, err
@@ -34,7 +37,9 @@ func Check(cfg *Config, state State, key, platform string) (*CheckResult, error)
 		installed = entry.InstalledVersion
 	}
 
+	p.StartSpinner("checking " + key)
 	mf, err := FetchManifest(cfg.ServerURL, pkg)
+	p.StopSpinner()
 	if err != nil {
 		return nil, err
 	}
@@ -57,20 +62,20 @@ func Check(cfg *Config, state State, key, platform string) (*CheckResult, error)
 
 // Update performs the full update flow for one installed entry.
 // It returns (updated bool, err).
-func Update(cfg *Config, state State, key, platform string, logf func(string, ...any)) (bool, error) {
-	if logf == nil {
-		logf = log.Printf
+func Update(cfg *Config, state State, key, platform string, p Progress) (bool, error) {
+	if p == nil {
+		p = PlainProgress{}
 	}
 
-	result, err := Check(cfg, state, key, platform)
+	result, err := CheckWithProgress(cfg, state, key, platform, p)
 	if err != nil {
 		return false, err
 	}
 	if !result.UpdateAvailable {
-		logf("%s: already at latest (%s)", key, result.LatestVersion)
+		p.Log("%s: already at latest (%s)", key, result.LatestVersion)
 		return false, nil
 	}
-	logf("%s: updating %s → %s", key, result.InstalledVersion, result.LatestVersion)
+	p.Log("%s: updating %s → %s", key, result.InstalledVersion, result.LatestVersion)
 
 	entry := state[key]
 	if entry == nil {
@@ -85,16 +90,18 @@ func Update(cfg *Config, state State, key, platform string, logf func(string, ..
 	bin := mf.Binaries[component][platform]
 
 	// Download to temp file
-	tmpFile, err := downloadToTemp(bin.URL, logf)
+	tmpFile, err := downloadToTemp(bin.URL, component, p)
 	if err != nil {
 		return false, fmt.Errorf("download: %w", err)
 	}
 	defer os.Remove(tmpFile)
 
 	// Verify SHA256
-	logf("%s: verifying SHA256", key)
-	if err := verifySHA256(tmpFile, bin.SHA256); err != nil {
-		return false, fmt.Errorf("sha256 mismatch: %w", err)
+	p.StartSpinner("verifying SHA256")
+	verifyErr := verifySHA256(tmpFile, bin.SHA256)
+	p.StopSpinner()
+	if verifyErr != nil {
+		return false, fmt.Errorf("sha256 mismatch: %w", verifyErr)
 	}
 
 	// Backup current binary
@@ -104,12 +111,12 @@ func Update(cfg *Config, state State, key, platform string, logf func(string, ..
 		if err != nil {
 			return false, fmt.Errorf("backup: %w", err)
 		}
-		logf("%s: backup → %s", key, backupPath)
+		p.Log("%s: backup → %s", key, backupPath)
 	}
 
 	// Stop service
 	if entry.ServiceName != "" {
-		logf("%s: stopping service %s", key, entry.ServiceName)
+		p.Log("%s: stopping service %s", key, entry.ServiceName)
 		if err := stopService(entry.ServiceName); err != nil {
 			return false, fmt.Errorf("stop service: %w", err)
 		}
@@ -120,53 +127,54 @@ func Update(cfg *Config, state State, key, platform string, logf func(string, ..
 		startService(entry.ServiceName) // best-effort restart
 		return false, fmt.Errorf("replace binary: %w", err)
 	}
-	logf("%s: binary replaced", key)
+	p.Log("%s: binary replaced", key)
 
 	// Start service
 	if entry.ServiceName != "" {
-		logf("%s: starting service %s", key, entry.ServiceName)
+		p.Log("%s: starting service %s", key, entry.ServiceName)
 		if err := startService(entry.ServiceName); err != nil {
-			doRollback(entry, backupPath, logf)
+			doRollback(entry, backupPath, p)
 			return false, fmt.Errorf("start service: %w", err)
 		}
 	}
 
 	// Health check
 	if entry.HealthCheck != "" {
-		logf("%s: health check: %s", key, entry.HealthCheck)
-		if err := healthCheck(entry.HealthCheck); err != nil {
-			logf("%s: health check failed: %v — rolling back", key, err)
-			doRollback(entry, backupPath, logf)
-			return false, fmt.Errorf("health check: %w", err)
+		p.StartSpinner("health check")
+		hcErr := healthCheck(entry.HealthCheck)
+		p.StopSpinner()
+		if hcErr != nil {
+			p.Log("%s: health check failed: %v — rolling back", key, hcErr)
+			doRollback(entry, backupPath, p)
+			return false, fmt.Errorf("health check: %w", hcErr)
 		}
 	}
 
 	// Update state
 	entry.InstalledVersion = mf.Version
 	entry.UpdatedAt = time.Now().UTC()
-	logf("%s: updated to %s", key, mf.Version)
+	p.Log("%s: ✓ updated to %s", key, mf.Version)
 	return true, nil
 }
 
-func doRollback(entry *InstallEntry, backupPath string, logf func(string, ...any)) {
+func doRollback(entry *InstallEntry, backupPath string, p Progress) {
 	if backupPath == "" {
-		logf("rollback: no backup available")
+		p.Log("rollback: no backup available")
 		return
 	}
 	if err := atomicReplace(backupPath, entry.BinaryPath); err != nil {
-		logf("rollback: replace failed: %v", err)
+		p.Log("rollback: replace failed: %v", err)
 		return
 	}
 	if entry.ServiceName != "" {
 		if err := startService(entry.ServiceName); err != nil {
-			logf("rollback: start service failed: %v", err)
+			p.Log("rollback: start service failed: %v", err)
 		}
 	}
-	logf("rollback: restored from %s", backupPath)
+	p.Log("rollback: restored from %s", backupPath)
 }
 
-func downloadToTemp(url string, logf func(string, ...any)) (string, error) {
-	logf("downloading %s", url)
+func downloadToTemp(url, name string, p Progress) (string, error) {
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return "", err
@@ -182,10 +190,15 @@ func downloadToTemp(url string, logf func(string, ...any)) (string, error) {
 	}
 	defer tmp.Close()
 
-	if _, err := io.Copy(tmp, resp.Body); err != nil {
+	var dst io.Writer = tmp
+	if pw := p.DownloadWriter(name, resp.ContentLength); pw != nil {
+		dst = io.MultiWriter(tmp, pw)
+	}
+	if _, err := io.Copy(dst, resp.Body); err != nil {
 		os.Remove(tmp.Name())
 		return "", err
 	}
+	p.FinishDownload()
 	return tmp.Name(), nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pawi1/pkgtug/internal/client"
+	"github.com/pawi1/pkgtug/internal/tui"
 )
 
 func (a *App) cmdCheck(args []string) error {
@@ -16,7 +17,12 @@ func (a *App) cmdCheck(args []string) error {
 	}
 	key := fs.Arg(0)
 
-	result, err := client.Check(a.cfg, a.state, key, a.platform)
+	var p client.Progress = client.PlainProgress{}
+	if tui.IsTerminal() {
+		p = tui.New()
+	}
+
+	result, err := client.CheckWithProgress(a.cfg, a.state, key, a.platform, p)
 	if err != nil {
 		return err
 	}
