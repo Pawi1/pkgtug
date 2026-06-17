@@ -54,6 +54,8 @@ func (r *jobRegistry) delete(id string) {
 
 func randomID() string {
 	b := make([]byte, 8)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand unavailable: " + err.Error())
+	}
 	return hex.EncodeToString(b)
 }

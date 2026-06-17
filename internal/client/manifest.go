@@ -5,17 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/pawi1/pkgtug/internal/manifest"
 )
 
-type Manifest struct {
-	Version  string                       `json:"version"`
-	Binaries map[string]map[string]Binary `json:"binaries"` // component → platform → binary
-}
-
-type Binary struct {
-	URL    string `json:"url"`
-	SHA256 string `json:"sha256"`
-}
+// Type aliases so callers share a single definition from internal/manifest.
+type Manifest = manifest.Manifest
+type Binary = manifest.Binary
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 

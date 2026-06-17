@@ -441,7 +441,8 @@ func UpdateGH(state State, key, platform string, p Progress, pickFn func([]GHAss
 		}
 	}
 
-	if abort, err := handleConflict(p, key, entry, tmpFile, ""); err != nil {
+	newSHA, _ := sha256File(tmpFile)
+	if abort, err := handleConflict(p, key, entry, tmpFile, newSHA); err != nil {
 		return false, err
 	} else if abort {
 		return false, nil
