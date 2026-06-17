@@ -6,6 +6,7 @@ server:
   cors_origins:
     - "*"   # allow all origins (required for GitHub Pages browser UI)
     # or restrict: - "https://youruser.github.io"
+  webhook_cooldown: "10s"   # min gap between webhook fetches per package (default 10s)
 
 telegram:
   bot_token: ""

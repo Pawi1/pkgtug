@@ -10,12 +10,13 @@ import (
 )
 
 type Server struct {
-	cfg      *config.ServerConfig
-	packages map[string]*config.Package
-	states   map[string]*packageState
-	jobs     *jobRegistry
-	tg       *notify.Telegram
-	fetchMu  sync.Map // per-package mutex to serialize concurrent fetches
+	cfg         *config.ServerConfig
+	packages    map[string]*config.Package
+	states      map[string]*packageState
+	jobs        *jobRegistry
+	tg          *notify.Telegram
+	fetchMu     sync.Map // per-package mutex to serialize concurrent fetches
+	webhookLast sync.Map // per-package last webhook time (time.Time)
 }
 
 func New(cfg *config.ServerConfig) *Server {

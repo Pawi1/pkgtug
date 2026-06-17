@@ -16,11 +16,12 @@ type ServerConfig struct {
 }
 
 type ServerSection struct {
-	Listen       string   `yaml:"listen"`
-	BaseURL      string   `yaml:"base_url"`
-	DataDir      string   `yaml:"data_dir"`
-	WorkerSecret string   `yaml:"worker_secret"`
-	CORSOrigins  []string `yaml:"cors_origins"` // e.g. ["*"] or ["https://user.github.io"]
+	Listen          string        `yaml:"listen"`
+	BaseURL         string        `yaml:"base_url"`
+	DataDir         string        `yaml:"data_dir"`
+	WorkerSecret    string        `yaml:"worker_secret"`
+	CORSOrigins     []string      `yaml:"cors_origins"`      // e.g. ["*"] or ["https://user.github.io"]
+	WebhookCooldown time.Duration `yaml:"webhook_cooldown"`  // min gap between webhook fetches per package (default 30s)
 }
 
 type TelegramSection struct {
@@ -128,6 +129,9 @@ func (c *ServerConfig) validate() error {
 func (c *ServerConfig) applyDefaults() {
 	if c.Server.Listen == "" {
 		c.Server.Listen = ":8080"
+	}
+	if c.Server.WebhookCooldown <= 0 {
+		c.Server.WebhookCooldown = 10 * time.Second
 	}
 	c.Server.BaseURL = strings.TrimRight(c.Server.BaseURL, "/")
 }

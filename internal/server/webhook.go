@@ -16,6 +16,12 @@ func (s *Server) handleFetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !s.webhookAllowed(name) {
+		w.Header().Set("Retry-After", "10")
+		http.Error(w, "rate limit: too many webhook requests", http.StatusTooManyRequests)
+		return
+	}
+
 	mu := s.packageMu(name)
 	if !mu.TryLock() {
 		w.WriteHeader(http.StatusAccepted)
