@@ -20,7 +20,23 @@ func (a *App) cmdInstall(args []string) error {
 	fs.Parse(args)
 
 	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: pkgtug install [<remote>:]<package>[/<component>]")
+		return fmt.Errorf("usage: pkgtug install [github:<owner>/<repo> | [<remote>:]<package>[/<component>]]")
+	}
+
+	// GitHub Releases shortcut: "github:owner/repo[/component-hint]"
+	if strings.HasPrefix(fs.Arg(0), "github:") {
+		spec := strings.TrimPrefix(fs.Arg(0), "github:")
+		// spec = "owner/repo" or "owner/repo/hint"
+		parts := strings.SplitN(spec, "/", 3)
+		if len(parts) < 2 {
+			return fmt.Errorf("usage: pkgtug install github:<owner>/<repo>[/<component>]")
+		}
+		ownerRepo := parts[0] + "/" + parts[1]
+		componentHint := ""
+		if len(parts) == 3 {
+			componentHint = parts[2]
+		}
+		return a.installGH(ownerRepo, componentHint, *autoUpdate)
 	}
 
 	remoteName, pkgName, component, err := parseInstallArg(fs.Arg(0))

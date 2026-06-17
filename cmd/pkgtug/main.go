@@ -97,7 +97,8 @@ Commands:
   remote list              list configured servers
 
   search [<query>]         search available packages across all remotes
-  install [<remote>:]<package>[/<component>]  install a package
+  install [<remote>:]<package>[/<component>]  install from a pkgtug server
+  install github:<owner>/<repo>[/<hint>]    install from GitHub Releases
   check <package/component>   check for an update
   update <package/component>  update to latest (--all for all packages)
   autoupdate [<package/component>]    mark/unmark package for daemon autoupdate (--remove to unmark)

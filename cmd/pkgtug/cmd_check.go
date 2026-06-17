@@ -16,12 +16,19 @@ func (a *App) cmdCheck(args []string) error {
 	}
 	key := fs.Arg(0)
 
-	serverURL, err := a.serverURLForKey(key)
-	if err != nil {
-		return err
-	}
+	var result *client.CheckResult
+	var err error
 
-	result, err := client.CheckWithProgress(serverURL, a.state, key, a.platform, a.newProgress())
+	if entry := a.state[key]; entry != nil && entry.GHSource != "" {
+		result, err = client.CheckGH(a.state, key, a.platform)
+	} else {
+		var serverURL string
+		serverURL, err = a.serverURLForKey(key)
+		if err != nil {
+			return err
+		}
+		result, err = client.CheckWithProgress(serverURL, a.state, key, a.platform, a.newProgress())
+	}
 	if err != nil {
 		return err
 	}

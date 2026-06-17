@@ -221,6 +221,8 @@ func downloadToTemp(url, name string, p Progress) (string, error) {
 	return tmp.Name(), nil
 }
 
+func VerifySHA256File(path, expected string) error { return verifySHA256(path, expected) }
+
 func verifySHA256(path, expected string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -386,6 +388,145 @@ func copyFile(src, dst string) error {
 	defer out.Close()
 	_, err = io.Copy(out, in)
 	return err
+}
+
+// CheckGH checks for a new version of a GitHub-sourced entry.
+func CheckGH(state State, key, platform string) (*CheckResult, error) {
+	entry := state[key]
+	if entry == nil {
+		return nil, fmt.Errorf("%s: not installed", key)
+	}
+	rel, err := FetchLatestGHRelease(entry.GHSource)
+	if err != nil {
+		return nil, err
+	}
+	return &CheckResult{
+		Key:              key,
+		InstalledVersion: entry.InstalledVersion,
+		LatestVersion:    rel.TagName,
+		UpdateAvailable:  entry.InstalledVersion != rel.TagName,
+	}, nil
+}
+
+// UpdateGH updates a GitHub-sourced entry to the latest release.
+// It always picks the same asset index by re-matching; if ambiguous it uses the picker.
+// In non-TTY contexts pickFn should return -1 to abort rather than block.
+func UpdateGH(state State, key, platform string, p Progress, pickFn func([]GHAsset) int) (bool, error) {
+	entry := state[key]
+	if entry == nil {
+		return false, fmt.Errorf("%s: not installed", key)
+	}
+
+	rel, err := FetchLatestGHRelease(entry.GHSource)
+	if err != nil {
+		return false, err
+	}
+	if entry.InstalledVersion == rel.TagName {
+		p.Log("%s: already at latest (%s)", key, rel.TagName)
+		return false, nil
+	}
+	p.Log("%s: updating %s → %s", key, entry.InstalledVersion, rel.TagName)
+
+	installable := InstallableAssets(rel.Assets)
+	idx := MatchGHAsset(installable, platform)
+	if idx < 0 {
+		idx = pickFn(installable)
+		if idx < 0 {
+			return false, fmt.Errorf("%s: could not determine asset — run pkgtug install github:%s to re-select", key, entry.GHSource)
+		}
+	}
+	asset := installable[idx]
+
+	tmpFile, err := downloadToTemp(asset.BrowserDownloadURL, asset.Name, p)
+	if err != nil {
+		return false, fmt.Errorf("download: %w", err)
+	}
+	defer os.Remove(tmpFile)
+
+	// Try checksum verification if a companion file is available.
+	if cs := FindChecksumAsset(rel.Assets, asset.Name); cs != nil {
+		if err := verifyGHChecksum(tmpFile, asset.Name, cs.BrowserDownloadURL); err != nil {
+			return false, fmt.Errorf("checksum: %w", err)
+		}
+	}
+
+	if abort, err := handleConflict(p, key, entry, tmpFile, ""); err != nil {
+		return false, err
+	} else if abort {
+		return false, nil
+	}
+
+	if entry.BackupDir != "" {
+		_, component, _ := SplitKey(key)
+		if _, err := backupBinary(entry.BinaryPath, entry.BackupDir, component); err != nil {
+			return false, fmt.Errorf("backup: %w", err)
+		}
+	}
+
+	if entry.ServiceName != "" {
+		if err := StopService(entry.ServiceName); err != nil {
+			return false, fmt.Errorf("stop service: %w", err)
+		}
+	}
+
+	if err := atomicReplace(tmpFile, entry.BinaryPath); err != nil {
+		StartService(entry.ServiceName)
+		return false, fmt.Errorf("replace binary: %w", err)
+	}
+
+	if entry.PostInstall != "" {
+		cmd := exec.Command("sh", "-c", entry.PostInstall)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return false, fmt.Errorf("post-install: %w\n%s", err, out)
+		}
+	}
+
+	if entry.ServiceName != "" {
+		if err := StartService(entry.ServiceName); err != nil {
+			doRollback(entry, "", p)
+			return false, fmt.Errorf("start service: %w", err)
+		}
+	}
+
+	if entry.HealthCheck != "" {
+		if err := healthCheck(entry.HealthCheck); err != nil {
+			doRollback(entry, "", p)
+			return false, fmt.Errorf("health check: %w", err)
+		}
+	}
+
+	currentSHA, _ := sha256File(entry.BinaryPath)
+	entry.InstalledVersion = rel.TagName
+	entry.InstalledSHA256 = currentSHA
+	entry.UpdatedAt = time.Now().UTC()
+	p.Log("%s: ✓ updated to %s", key, rel.TagName)
+	return true, nil
+}
+
+func verifyGHChecksum(tmpFile, assetName, checksumURL string) error {
+	resp, err := httpClient.Get(checksumURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	content := string(data)
+	// Format: "<sha256>  <filename>" (one entry per line)
+	for _, line := range strings.Split(content, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[1] == assetName {
+			return verifySHA256(tmpFile, fields[0])
+		}
+	}
+	// Single-file checksum: just the hash
+	trimmed := strings.TrimSpace(content)
+	if len(trimmed) == 64 { // SHA256 hex
+		return verifySHA256(tmpFile, trimmed)
+	}
+	return nil // checksum file format unrecognised — skip
 }
 
 func SplitKey(key string) (pkg, component string, err error) {

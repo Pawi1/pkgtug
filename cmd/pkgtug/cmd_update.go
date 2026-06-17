@@ -22,11 +22,31 @@ func (a *App) cmdUpdate(args []string) error {
 }
 
 func (a *App) updateOne(key string) error {
+	entry := a.state[key]
+	p := a.newProgress()
+
+	// GitHub source — use dedicated update path.
+	if entry != nil && entry.GHSource != "" {
+		updated, err := client.UpdateGH(a.state, key, a.platform, p, func(assets []client.GHAsset) int {
+			return pickGHAsset(assets)
+		})
+		if err != nil {
+			a.tg.UpdateFailure(key, err.Error())
+			return err
+		}
+		if updated {
+			if err := a.saveState(); err != nil {
+				p.Log("save state: %v", err)
+			}
+			a.tg.UpdateSuccess(key, a.state[key].InstalledVersion)
+		}
+		return nil
+	}
+
 	serverURL, err := a.serverURLForKey(key)
 	if err != nil {
 		return err
 	}
-	p := a.newProgress()
 	updated, err := updateEntry(a, serverURL, key, p)
 	if err != nil {
 		a.tg.UpdateFailure(key, err.Error())

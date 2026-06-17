@@ -22,6 +22,7 @@ type InstallEntry struct {
 	DependsOn        []string  `json:"depends_on,omitempty"` // other installed package/component keys
 	PostInstall      string    `json:"post_install,omitempty"`  // shell command run after each update
 	InstalledSHA256  string    `json:"installed_sha256,omitempty"` // SHA256 of file as pkgtug last wrote it
+	GHSource         string    `json:"gh_source,omitempty"`        // "owner/repo" when installed from GitHub Releases
 }
 
 // State maps "<package>/<component>" → InstallEntry.
