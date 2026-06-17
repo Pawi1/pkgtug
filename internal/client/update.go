@@ -89,14 +89,12 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 	}
 	bin := mf.Binaries[component][platform]
 
-	// Download to temp file
 	tmpFile, err := downloadToTemp(bin.URL, component, p)
 	if err != nil {
 		return false, fmt.Errorf("download: %w", err)
 	}
 	defer os.Remove(tmpFile)
 
-	// Verify SHA256
 	p.StartSpinner("verifying SHA256")
 	verifyErr := verifySHA256(tmpFile, bin.SHA256)
 	p.StopSpinner()
@@ -104,7 +102,6 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		return false, fmt.Errorf("sha256 mismatch: %w", verifyErr)
 	}
 
-	// Backup current binary
 	backupPath := ""
 	if entry.BackupDir != "" {
 		backupPath, err = backupBinary(entry.BinaryPath, entry.BackupDir, component)
@@ -114,7 +111,6 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		p.Log("%s: backup → %s", key, backupPath)
 	}
 
-	// Stop service
 	if entry.ServiceName != "" {
 		p.Log("%s: stopping service %s", key, entry.ServiceName)
 		if err := StopService(entry.ServiceName); err != nil {
@@ -122,7 +118,7 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		}
 	}
 
-	// Conflict detection for user-editable files (non-empty InstalledSHA256 baseline).
+	// Check for local edits before replacing user-editable files.
 	if entry.InstalledSHA256 != "" {
 		if abort, err := handleConflict(p, key, entry, tmpFile, bin.SHA256); err != nil {
 			return false, err
@@ -131,14 +127,12 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		}
 	}
 
-	// Atomic replace
 	if err := atomicReplace(tmpFile, entry.BinaryPath); err != nil {
 		StartService(entry.ServiceName) // best-effort restart
 		return false, fmt.Errorf("replace binary: %w", err)
 	}
 	p.Log("%s: binary replaced", key)
 
-	// Start service
 	if entry.ServiceName != "" {
 		p.Log("%s: starting service %s", key, entry.ServiceName)
 		if err := StartService(entry.ServiceName); err != nil {
@@ -147,7 +141,6 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		}
 	}
 
-	// Post-install hook (e.g. systemctl daemon-reload)
 	if entry.PostInstall != "" {
 		p.Log("%s: running post-install: %s", key, entry.PostInstall)
 		cmd := exec.Command("sh", "-c", entry.PostInstall)
@@ -156,7 +149,6 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		}
 	}
 
-	// Health check
 	if entry.HealthCheck != "" {
 		p.StartSpinner("health check")
 		hcErr := healthCheck(entry.HealthCheck)
@@ -168,7 +160,6 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 		}
 	}
 
-	// Update state
 	entry.InstalledVersion = mf.Version
 	entry.InstalledSHA256 = bin.SHA256
 	entry.UpdatedAt = time.Now().UTC()
@@ -319,7 +310,7 @@ func handleConflict(p Progress, key string, entry *InstallEntry, newTmp, newSHA2
 		return false, nil
 	}
 
-	// Genuine conflict: user changed the file AND a new version arrived.
+	// Both sides changed since the last installed baseline.
 	diffText := runDiff(entry.BinaryPath, newTmp)
 	action := p.ResolveConflict(key, entry.BinaryPath, diffText)
 

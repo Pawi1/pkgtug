@@ -20,24 +20,6 @@ func newPackageState() *packageState {
 	}
 }
 
-// pendingPlatforms returns platforms that need a build job for the current version.
-// A platform needs a job when its built version differs from currentVersion
-// and there is no live (non-timed-out) active job for it.
-func (ps *packageState) pendingPlatforms(jobTimeout time.Duration) []string {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
-	if ps.currentVersion == "" {
-		return nil
-	}
-	var out []string
-	// We only produce a job for platforms that already have an active (timed-out)
-	// or no job — callers ask per platform, so we return a bool here indirectly.
-	// This method is not used directly; see needsJob below.
-	_ = out
-	return nil
-}
-
 // needsJob reports whether the given platform should receive a new build job.
 func (ps *packageState) needsJob(platform string, jobTimeout time.Duration) bool {
 	ps.mu.Lock()

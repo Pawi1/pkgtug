@@ -44,7 +44,6 @@ func (a *App) cmdInstall(args []string) error {
 		return err
 	}
 
-	// Resolve remote URL — auto-discover if not specified
 	serverURL, remoteName, err := a.resolveRemote(remoteName, pkgName)
 	if err != nil {
 		return err
@@ -63,7 +62,6 @@ func (a *App) cmdInstall(args []string) error {
 		return fmt.Errorf("no binaries available for %s yet", pkgName)
 	}
 
-	// Resolve component
 	if component == "" {
 		components := make([]string, 0, len(mf.Binaries))
 		for c := range mf.Binaries {
@@ -221,7 +219,6 @@ func promptPostInstall(binaryPath string) string {
 func suggestPostInstall(path string) string {
 	switch {
 	case strings.HasPrefix(path, "/etc/systemd/") && strings.HasSuffix(path, ".service"):
-		// Extract unit name for enable suggestion
 		base := filepath.Base(path)
 		unit := strings.TrimSuffix(base, ".service")
 		return "systemctl daemon-reload && systemctl enable " + unit
@@ -245,7 +242,6 @@ func promptServiceName() string {
 	}
 	name, chosen := pickFromListOptional("Service to stop/start during update:", services)
 	if !chosen {
-		// Fall back to free text in case the service isn't in the list yet
 		return promptOptional("Service name (or Enter to skip)")
 	}
 	return name
@@ -295,7 +291,7 @@ func (a *App) resolveRemote(remoteName, pkgName string) (string, string, error) 
 		r := a.cfg.Remotes[0]
 		return r.URL, r.Name, nil
 	}
-	// Search all remotes for the package
+	// Probe each configured remote until the package is found.
 	p := a.newProgress()
 	for _, r := range a.cfg.Remotes {
 		p.StartSpinner("checking " + r.Name)

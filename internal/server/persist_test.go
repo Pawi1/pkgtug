@@ -8,7 +8,6 @@ import (
 func TestPersistRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 
-	// Build states
 	states := map[string]*packageState{
 		"myapp": {
 			currentVersion: "1.2.3",
@@ -40,7 +39,6 @@ func TestPersistRoundTrip(t *testing.T) {
 
 func TestPersistMissingFile(t *testing.T) {
 	dir := t.TempDir()
-	// Remove any file that might exist
 	os.Remove(statePath(dir))
 
 	s, err := loadPersistedState(dir)

@@ -22,7 +22,7 @@ build-client:
 clean:
 	rm -rf $(BIN_DIR)
 
-# Cross-compile targets (użyj przez distrobox lub z odpowiednim GOOS/GOARCH)
+# Cross-compile targets. Use distrobox or set GOOS/GOARCH directly.
 build-linux-amd64:
 	mkdir -p $(BIN_DIR)
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BIN_DIR)/pkgtug-server-linux-amd64 ./cmd/pkgtug-server

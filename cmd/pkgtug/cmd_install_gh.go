@@ -32,7 +32,6 @@ func (a *App) installGH(ownerRepo, componentHint string, autoUpdate bool) error 
 		return fmt.Errorf("no downloadable assets in release %s", rel.TagName)
 	}
 
-	// Filter by component hint if provided.
 	if componentHint != "" {
 		var filtered []client.GHAsset
 		for _, a := range installable {
@@ -45,7 +44,6 @@ func (a *App) installGH(ownerRepo, componentHint string, autoUpdate bool) error 
 		}
 	}
 
-	// Try auto-match; fall back to picker.
 	idx := client.MatchGHAsset(installable, a.platform)
 	if idx < 0 {
 		idx = pickGHAsset(installable)
@@ -54,7 +52,6 @@ func (a *App) installGH(ownerRepo, componentHint string, autoUpdate bool) error 
 	}
 	asset := installable[idx]
 
-	// Derive a component name from the repo name.
 	component := componentHint
 	if component == "" {
 		parts := strings.SplitN(ownerRepo, "/", 2)
@@ -83,7 +80,6 @@ func (a *App) installGH(ownerRepo, componentHint string, autoUpdate bool) error 
 	}
 	defer os.Remove(tmpFile)
 
-	// Verify checksum if available.
 	if cs := client.FindChecksumAsset(rel.Assets, asset.Name); cs != nil {
 		p.StartSpinner("verifying checksum")
 		err = verifyGHChecksumLocal(tmpFile, asset.Name, cs.BrowserDownloadURL)
