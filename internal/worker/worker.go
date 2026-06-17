@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pawi1/pkgtug/internal/compress"
 	"github.com/pawi1/pkgtug/internal/config"
 	"github.com/pawi1/pkgtug/internal/gitops"
 )
@@ -36,6 +37,7 @@ type job struct {
 	Version      string          `json:"version"`
 	BuildCommand string          `json:"build_command"`
 	Binaries     []config.Binary `json:"binaries"`
+	Compress     string          `json:"compress,omitempty"`
 }
 
 // ErrNoJob is returned by RunOnce when the server has no pending jobs.
@@ -175,9 +177,17 @@ func scrubEnv(env []string, keys ...string) []string {
 }
 
 func postSuccess(ctx context.Context, client *http.Client, cfg Config, j *job, cloneDir string) error {
+	algo, err := compress.Parse(j.Compress)
+	if err != nil {
+		return postError(ctx, client, cfg, j, err.Error())
+	}
+
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 	mw.WriteField("status", "ok")
+	if algo != compress.None {
+		mw.WriteField("compressed", string(algo))
+	}
 
 	for _, bin := range j.Binaries {
 		binPath := filepath.Join(cloneDir, bin.Path)
@@ -190,13 +200,22 @@ func postSuccess(ctx context.Context, client *http.Client, cfg Config, j *job, c
 			f.Close()
 			return err
 		}
+		cw, err := compress.NewWriter(part, algo)
+		if err != nil {
+			f.Close()
+			return err
+		}
 		h := sha256.New()
-		if _, err := io.Copy(io.MultiWriter(part, h), f); err != nil {
+		if _, err := io.Copy(io.MultiWriter(cw, h), f); err != nil {
+			f.Close()
+			return err
+		}
+		if err := cw.Close(); err != nil {
 			f.Close()
 			return err
 		}
 		f.Close()
-		log.Printf("worker [%s]: %s sha256=%s", j.ID, bin.Component, hex.EncodeToString(h.Sum(nil)))
+		log.Printf("worker [%s]: %s sha256=%s compress=%s", j.ID, bin.Component, hex.EncodeToString(h.Sum(nil)), algo)
 	}
 	mw.Close()
 

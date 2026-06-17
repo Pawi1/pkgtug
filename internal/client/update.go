@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/pawi1/pkgtug/internal/compress"
 )
 
 // CheckResult is returned by Check.
@@ -89,7 +91,11 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 	}
 	bin := mf.Binaries[component][platform]
 
-	tmpFile, err := downloadToTemp(bin.URL, component, p)
+	algo, err := compress.Parse(bin.Compressed)
+	if err != nil {
+		return false, err
+	}
+	tmpFile, err := downloadToTempCompressed(bin.URL, component, algo, p)
 	if err != nil {
 		return false, fmt.Errorf("download: %w", err)
 	}
@@ -185,6 +191,10 @@ func doRollback(entry *InstallEntry, backupPath string, p Progress) {
 }
 
 func downloadToTemp(url, name string, p Progress) (string, error) {
+	return downloadToTempCompressed(url, name, compress.None, p)
+}
+
+func downloadToTempCompressed(url, name string, algo compress.Algo, p Progress) (string, error) {
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return "", err
@@ -200,11 +210,26 @@ func downloadToTemp(url, name string, p Progress) (string, error) {
 	}
 	defer tmp.Close()
 
+	body := resp.Body
+	if algo != compress.None {
+		rc, err := compress.NewReader(resp.Body, algo)
+		if err != nil {
+			os.Remove(tmp.Name())
+			return "", fmt.Errorf("decompress: %w", err)
+		}
+		defer rc.Close()
+		body = rc
+	}
+
 	var dst io.Writer = tmp
-	if pw := p.DownloadWriter(name, resp.ContentLength); pw != nil {
+	size := resp.ContentLength
+	if algo != compress.None {
+		size = -1 // unknown after decompression
+	}
+	if pw := p.DownloadWriter(name, size); pw != nil {
 		dst = io.MultiWriter(tmp, pw)
 	}
-	if _, err := io.Copy(dst, resp.Body); err != nil {
+	if _, err := io.Copy(dst, body); err != nil {
 		os.Remove(tmp.Name())
 		return "", err
 	}

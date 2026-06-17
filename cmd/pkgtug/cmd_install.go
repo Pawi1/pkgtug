@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pawi1/pkgtug/internal/client"
+	"github.com/pawi1/pkgtug/internal/compress"
 	"github.com/pawi1/pkgtug/internal/tui"
 )
 
@@ -99,6 +100,11 @@ func (a *App) cmdInstall(args []string) error {
 	backupDir := promptOptional("Backup directory (for rollback)")
 	deps := promptDependencies(a)
 
+	algo, err := compress.Parse(bin.Compressed)
+	if err != nil {
+		return err
+	}
+
 	fmt.Println()
 	resp, err := http.Get(bin.URL)
 	if err != nil {
@@ -120,14 +126,29 @@ func (a *App) cmdInstall(args []string) error {
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
 
+	body := io.Reader(resp.Body)
+	if algo != compress.None {
+		rc, err := compress.NewReader(resp.Body, algo)
+		if err != nil {
+			tmp.Close()
+			return fmt.Errorf("decompress: %w", err)
+		}
+		defer rc.Close()
+		body = rc
+	}
+
 	var dst io.Writer = tmp
+	size := resp.ContentLength
+	if algo != compress.None {
+		size = -1
+	}
 	if tui.IsTerminal() {
 		ui := tui.New()
-		if pw := ui.DownloadWriter(component, resp.ContentLength); pw != nil {
+		if pw := ui.DownloadWriter(component, size); pw != nil {
 			dst = io.MultiWriter(tmp, pw)
 		}
 	}
-	if _, err := io.Copy(dst, resp.Body); err != nil {
+	if _, err := io.Copy(dst, body); err != nil {
 		tmp.Close()
 		return fmt.Errorf("download write: %w", err)
 	}

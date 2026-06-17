@@ -13,14 +13,15 @@ const jobTimeout = 10 * time.Minute
 
 // Job represents a pending or active build task.
 type Job struct {
-	ID           string         `json:"job_id"`
-	PackageName  string         `json:"package"`
-	GitURL       string         `json:"git_url"`
-	Version      string         `json:"version"`
-	BuildCommand string         `json:"build_command"`
+	ID           string          `json:"job_id"`
+	PackageName  string          `json:"package"`
+	GitURL       string          `json:"git_url"`
+	Version      string          `json:"version"`
+	BuildCommand string          `json:"build_command"`
 	Binaries     []config.Binary `json:"binaries"`
-	Platform     string         `json:"platform"`
-	ClaimedAt    time.Time      `json:"-"`
+	Platform     string          `json:"platform"`
+	Compress     string          `json:"compress,omitempty"`
+	ClaimedAt    time.Time       `json:"-"`
 }
 
 // jobRegistry maps job ID → job for result lookup.

@@ -43,6 +43,7 @@ func (s *Server) handleBuildNext(w http.ResponseWriter, r *http.Request) {
 			BuildCommand: pkg.BuildCommand,
 			Binaries:     pkg.Binaries,
 			Platform:     platform,
+			Compress:     pkg.Compress,
 			ClaimedAt:    time.Now(),
 		}
 		state.claimJob(platform, j)
@@ -109,12 +110,13 @@ func (s *Server) handleBuildResult(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) storeBuildResult(job *Job, r *http.Request) error {
+	compressed := r.FormValue("compressed") // "zstd" | "xz" | ""
 	for _, bin := range job.Binaries {
 		fh, _, err := r.FormFile(bin.Component)
 		if err != nil {
 			return fmt.Errorf("component %q missing from upload: %w", bin.Component, err)
 		}
-		if err := s.storeBinary(job.PackageName, job.Version, job.Platform, bin.Component, fh); err != nil {
+		if err := s.storeBinary(job.PackageName, job.Version, job.Platform, bin.Component, compressed, fh); err != nil {
 			fh.Close()
 			return err
 		}
@@ -124,7 +126,7 @@ func (s *Server) storeBuildResult(job *Job, r *http.Request) error {
 }
 
 // storeBinary saves one binary file and updates the package manifest atomically.
-func (s *Server) storeBinary(pkgName, version, platform, component string, src io.Reader) error {
+func (s *Server) storeBinary(pkgName, version, platform, component, compressed string, src io.Reader) error {
 	for _, seg := range []string{pkgName, version, platform, component} {
 		if err := validPathComponent(seg); err != nil {
 			return fmt.Errorf("invalid upload field: %w", err)
@@ -158,7 +160,7 @@ func (s *Server) storeBinary(pkgName, version, platform, component string, src i
 	}
 	url := fmt.Sprintf("%s/tug/repo/%s/binaries/%s/%s/%s",
 		s.cfg.Server.BaseURL, pkgName, version, platform, component)
-	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: sum}
+	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: sum, Compressed: compressed}
 
 	return manifest.WriteAtomic(mfPath, mf)
 }

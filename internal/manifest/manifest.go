@@ -13,8 +13,9 @@ type Manifest struct {
 }
 
 type Binary struct {
-	URL    string `json:"url"`
-	SHA256 string `json:"sha256"`
+	URL        string `json:"url"`
+	SHA256     string `json:"sha256"`
+	Compressed string `json:"compressed,omitempty"` // "zstd" | "xz" | ""
 }
 
 func Load(path string) (*Manifest, error) {

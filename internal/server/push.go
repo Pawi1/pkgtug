@@ -36,6 +36,7 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 	version := r.FormValue("version")
 	platform := r.FormValue("platform")
 	component := r.FormValue("component")
+	compressed := r.FormValue("compressed") // optional: "zstd" | "xz"
 
 	switch {
 	case version == "":
@@ -56,7 +57,7 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 	}
 	defer fh.Close()
 
-	if err := s.storeBinary(name, version, platform, component, fh); err != nil {
+	if err := s.storeBinary(name, version, platform, component, compressed, fh); err != nil {
 		log.Printf("push %s [%s %s %s]: store failed: %v", name, version, platform, component, err)
 		http.Error(w, "store failed", http.StatusInternalServerError)
 		return

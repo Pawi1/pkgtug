@@ -38,6 +38,7 @@ type Package struct {
 	BuildCommand  string        `yaml:"build_command"`
 	Binaries      []Binary      `yaml:"binaries"`
 	PollInterval  time.Duration `yaml:"poll_interval"` // 0 = disabled; e.g. "5m"
+	Compress      string        `yaml:"compress"`       // "zstd" | "xz" | "" (none)
 }
 
 type VersionSource struct {
