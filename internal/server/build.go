@@ -136,18 +136,14 @@ func (s *Server) storeBinary(pkgName, version, platform, component string, src i
 	if err := underRoot(pkgRoot, filepath.Join(pkgDir, component)); err != nil {
 		return fmt.Errorf("path traversal detected: %w", err)
 	}
-	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil { //nolint // codeql[go/path-injection] - all segments validated by validPathComponent and underRoot above
 		return err
 	}
 
 	destPath := filepath.Join(pkgDir, component)
-	if err := saveFile(src, destPath); err != nil {
-		return fmt.Errorf("save %s: %w", component, err)
-	}
-
-	sum, err := sha256File(destPath)
+	sum, err := saveFile(src, destPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("save %s: %w", component, err)
 	}
 
 	mfPath := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName, "manifest.json")
@@ -166,14 +162,19 @@ func (s *Server) storeBinary(pkgName, version, platform, component string, src i
 	return manifest.WriteAtomic(mfPath, mf)
 }
 
-func saveFile(src io.Reader, dst string) error {
-	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+// saveFile writes src to dst and returns the SHA-256 hex digest of the written bytes.
+// Computing the hash during the write avoids a second read of a user-supplied path.
+func saveFile(src io.Reader, dst string) (string, error) {
+	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755) //nolint // codeql[go/path-injection] - dst is derived from segments pre-validated by storeBinary
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer f.Close()
-	_, err = io.Copy(f, src)
-	return err
+	h := sha256.New()
+	if _, err = io.Copy(io.MultiWriter(f, h), src); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func sha256File(path string) (string, error) {
