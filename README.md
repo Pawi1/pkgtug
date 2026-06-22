@@ -1,3 +1,5 @@
+<img src="https://pawi1.github.io/pkgtug/pkgtug.svg" alt="pkgtug" width="96">
+
 # pkgtug
 
 A self-hosted, generic package manager and auto-updater for binary releases.
