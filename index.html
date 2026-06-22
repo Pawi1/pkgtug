@@ -679,9 +679,13 @@ async function fzstdDecompress(data) {
 }
 
 async function xzDecompress(responseBody) {
-  // xz-decompress exports XzReadableStream — ES module only, no UMD build
-  const { XzReadableStream } = await import('https://esm.sh/xz-decompress');
-  return new Uint8Array(await new Response(new XzReadableStream(responseBody)).arrayBuffer());
+  if (!window._XzRS) {
+    // UMD bundle sets window["xz-decompress"]; uses globalThis.ReadableStream internally
+    await loadScript('https://cdn.jsdelivr.net/npm/xz-decompress/dist/package/xz-decompress.js');
+    window._XzRS = window['xz-decompress']?.XzReadableStream;
+    if (!window._XzRS) throw new Error('XzReadableStream not found in bundle');
+  }
+  return new Uint8Array(await new Response(new window._XzRS(responseBody)).arrayBuffer());
 }
 
 function loadScript(src) {
