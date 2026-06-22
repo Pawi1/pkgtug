@@ -43,14 +43,14 @@ func (a *App) daemonTick() {
 		if !entry.AutoUpdate {
 			continue
 		}
-		serverURL, err := a.serverURLForKey(key)
+		remote, err := a.remoteForKey(key)
 		if err != nil {
 			log.Printf("daemon: %s: %v", key, err)
 			continue
 		}
 		p := a.newProgress()
 		prev := a.state[key].InstalledVersion
-		didUpdate, err := updateEntry(a, serverURL, key, p)
+		didUpdate, err := updateEntry(a, remote.URL, remote.Token, key, p)
 		if err != nil {
 			log.Printf("daemon: %s: update failed: %v", key, err)
 			a.tg.UpdateFailure(key, err.Error())

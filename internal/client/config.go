@@ -19,8 +19,9 @@ type Config struct {
 }
 
 type Remote struct {
-	Name string `yaml:"name"`
-	URL  string `yaml:"url"`
+	Name  string `yaml:"name"`
+	URL   string `yaml:"url"`
+	Token string `yaml:"token,omitempty"` // download token for protected packages
 }
 
 type TelegramSection struct {

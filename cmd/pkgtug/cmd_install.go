@@ -106,7 +106,7 @@ func (a *App) cmdInstall(args []string) error {
 	}
 
 	fmt.Println()
-	resp, err := http.Get(bin.URL)
+	resp, err := a.downloadWithToken(bin.URL, remoteName)
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
 	}

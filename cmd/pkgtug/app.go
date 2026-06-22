@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/pawi1/pkgtug/internal/client"
 	"github.com/pawi1/pkgtug/internal/notify"
@@ -42,6 +43,21 @@ func (a *App) newProgress() client.Progress {
 		return tui.New()
 	}
 	return client.PlainProgress{}
+}
+
+// downloadWithToken performs an authenticated GET using the token of the named remote.
+func (a *App) downloadWithToken(url, remoteName string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range a.cfg.Remotes {
+		if r.Name == remoteName && r.Token != "" {
+			req.Header.Set("Authorization", "Bearer "+r.Token)
+			break
+		}
+	}
+	return http.DefaultClient.Do(req)
 }
 
 // remoteURL returns the server URL for the named remote.

@@ -43,11 +43,11 @@ func (a *App) updateOne(key string) error {
 		return nil
 	}
 
-	serverURL, err := a.serverURLForKey(key)
+	remote, err := a.remoteForKey(key)
 	if err != nil {
 		return err
 	}
-	updated, err := updateEntry(a, serverURL, key, p)
+	updated, err := updateEntry(a, remote.URL, remote.Token, key, p)
 	if err != nil {
 		a.tg.UpdateFailure(key, err.Error())
 		return err
@@ -62,8 +62,8 @@ func (a *App) updateOne(key string) error {
 }
 
 // updateEntry performs a single update and returns whether the binary changed.
-func updateEntry(a *App, serverURL, key string, p client.Progress) (bool, error) {
-	return client.Update(serverURL, a.state, key, a.platform, p)
+func updateEntry(a *App, serverURL, token, key string, p client.Progress) (bool, error) {
+	return client.Update(serverURL, token, a.state, key, a.platform, p)
 }
 
 func (a *App) updateAll() error {

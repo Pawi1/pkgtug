@@ -18,6 +18,8 @@ func (a *App) cmdRemote(args []string) error {
 		return a.remoteRemove(args[1:])
 	case "list", "ls":
 		return a.remoteList()
+	case "set-token":
+		return a.remoteSetToken(args[1:])
 	case "meta":
 		return a.remoteMeta(args[1:])
 	default:
@@ -26,20 +28,50 @@ func (a *App) cmdRemote(args []string) error {
 }
 
 func (a *App) remoteAdd(args []string) error {
-	if len(args) != 2 {
-		return fmt.Errorf("usage: pkgtug remote add <name> <url>")
+	if len(args) < 2 || len(args) > 3 {
+		return fmt.Errorf("usage: pkgtug remote add <name> <url> [token]")
 	}
 	name, url := args[0], strings.TrimRight(args[1], "/")
+	token := ""
+	if len(args) == 3 {
+		token = args[2]
+	}
 
 	if a.cfg.HasRemote(name) {
 		return fmt.Errorf("remote %q already exists — remove it first", name)
 	}
-	a.cfg.Remotes = append(a.cfg.Remotes, client.Remote{Name: name, URL: url})
+	a.cfg.Remotes = append(a.cfg.Remotes, client.Remote{Name: name, URL: url, Token: token})
 	if err := a.saveConfig(); err != nil {
 		return err
 	}
 	fmt.Printf("remote %q added (%s)\n", name, url)
 	return nil
+}
+
+func (a *App) remoteSetToken(args []string) error {
+	if len(args) < 1 || len(args) > 2 {
+		return fmt.Errorf("usage: pkgtug remote set-token <name> [token]  (omit token to clear)")
+	}
+	name := args[0]
+	token := ""
+	if len(args) == 2 {
+		token = args[1]
+	}
+	for i := range a.cfg.Remotes {
+		if a.cfg.Remotes[i].Name == name {
+			a.cfg.Remotes[i].Token = token
+			if err := a.saveConfig(); err != nil {
+				return err
+			}
+			if token == "" {
+				fmt.Printf("token cleared for remote %q\n", name)
+			} else {
+				fmt.Printf("token set for remote %q\n", name)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("remote %q not found", name)
 }
 
 func (a *App) remoteRemove(args []string) error {

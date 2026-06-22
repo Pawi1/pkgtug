@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
@@ -37,9 +38,22 @@ func (s *Server) handleBinaryDownload(w http.ResponseWriter, r *http.Request) {
 	platform := r.PathValue("platform")
 	component := r.PathValue("component")
 
-	if _, ok := s.packages[name]; !ok {
+	pkg, ok := s.packages[name]
+	if !ok {
 		http.Error(w, "package not found", http.StatusNotFound)
 		return
+	}
+
+	if pkg.DownloadToken != "" {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if token == "" {
+			token = r.URL.Query().Get("token")
+		}
+		if token != pkg.DownloadToken {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="pkgtug"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 	}
 
 	if version == "latest" {

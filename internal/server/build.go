@@ -165,6 +165,7 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 		case pkg.GitURL != "":
 			mf.SourceURL = pkg.GitURL
 		}
+		mf.AuthRequired = pkg.DownloadToken != ""
 	}
 	if mf.Binaries[component] == nil {
 		mf.Binaries[component] = make(map[string]manifest.Binary)

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/pawi1/pkgtug/internal/client"
 )
 
 func (a *App) cmdStatus(_ []string) error {
@@ -25,13 +27,33 @@ func (a *App) cmdStatus(_ []string) error {
 
 // serverURLForKey returns the server URL for an installed package's remote.
 func (a *App) serverURLForKey(key string) (string, error) {
+	r, err := a.remoteForKey(key)
+	if err != nil {
+		return "", err
+	}
+	return r.URL, nil
+}
+
+// remoteForKey returns the Remote for an installed package (URL + token).
+func (a *App) remoteForKey(key string) (client.Remote, error) {
 	entry := a.state[key]
-	if entry == nil {
-		// Not installed yet — use default remote resolution
-		return a.remoteURL("")
+	name := ""
+	if entry != nil {
+		name = entry.Remote
 	}
-	if entry.Remote == "" {
-		return a.remoteURL("")
+	if name == "" {
+		if len(a.cfg.Remotes) == 1 {
+			return a.cfg.Remotes[0], nil
+		}
+		if len(a.cfg.Remotes) == 0 {
+			return client.Remote{}, fmt.Errorf("no remotes configured")
+		}
+		return client.Remote{}, fmt.Errorf("multiple remotes configured — specify remote as <remote>:<package>")
 	}
-	return a.cfg.RemoteURL(entry.Remote)
+	for _, r := range a.cfg.Remotes {
+		if r.Name == name {
+			return r, nil
+		}
+	}
+	return client.Remote{}, fmt.Errorf("remote %q not found", name)
 }

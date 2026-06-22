@@ -8,9 +8,10 @@ import (
 )
 
 type Manifest struct {
-	Version   string                       `json:"version"`
-	SourceURL string                       `json:"source_url,omitempty"` // git repo or project URL
-	Binaries  map[string]map[string]Binary `json:"binaries"`             // component → platform → binary
+	Version      string                       `json:"version"`
+	SourceURL    string                       `json:"source_url,omitempty"`    // git repo or project URL
+	AuthRequired bool                         `json:"auth_required,omitempty"` // binary downloads require Authorization: Bearer token
+	Binaries     map[string]map[string]Binary `json:"binaries"`                // component → platform → binary
 }
 
 type Binary struct {

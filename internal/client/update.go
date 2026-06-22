@@ -24,10 +24,10 @@ type CheckResult struct {
 }
 
 func Check(serverURL string, state State, key, platform string) (*CheckResult, error) {
-	return CheckWithProgress(serverURL, state, key, platform, PlainProgress{})
+	return CheckWithProgress(serverURL, "", state, key, platform, PlainProgress{})
 }
 
-func CheckWithProgress(serverURL string, state State, key, platform string, p Progress) (*CheckResult, error) {
+func CheckWithProgress(serverURL, token string, state State, key, platform string, p Progress) (*CheckResult, error) {
 	pkg, component, err := SplitKey(key)
 	if err != nil {
 		return nil, err
@@ -64,12 +64,12 @@ func CheckWithProgress(serverURL string, state State, key, platform string, p Pr
 
 // Update performs the full update flow for one installed entry.
 // It returns (updated bool, err).
-func Update(serverURL string, state State, key, platform string, p Progress) (bool, error) {
+func Update(serverURL, token string, state State, key, platform string, p Progress) (bool, error) {
 	if p == nil {
 		p = PlainProgress{}
 	}
 
-	result, err := CheckWithProgress(serverURL, state, key, platform, p)
+	result, err := CheckWithProgress(serverURL, token, state, key, platform, p)
 	if err != nil {
 		return false, err
 	}
@@ -95,7 +95,7 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 	if err != nil {
 		return false, err
 	}
-	tmpFile, err := downloadToTempCompressed(bin.URL, component, algo, p)
+	tmpFile, err := downloadToTempCompressed(bin.URL, token, component, algo, p)
 	if err != nil {
 		return false, fmt.Errorf("download: %w", err)
 	}
@@ -191,11 +191,18 @@ func doRollback(entry *InstallEntry, backupPath string, p Progress) {
 }
 
 func downloadToTemp(url, name string, p Progress) (string, error) {
-	return downloadToTempCompressed(url, name, compress.None, p)
+	return downloadToTempCompressed(url, "", name, compress.None, p)
 }
 
-func downloadToTempCompressed(url, name string, algo compress.Algo, p Progress) (string, error) {
-	resp, err := httpClient.Get(url)
+func downloadToTempCompressed(url, token, name string, algo compress.Algo, p Progress) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
