@@ -27,6 +27,9 @@ func (s *Server) handleBuildNext(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for name, pkg := range s.packages {
+		if pkg.DirectPush {
+			continue
+		}
 		state := s.states[name]
 		if !state.needsJob(platform, jobTimeout) {
 			continue

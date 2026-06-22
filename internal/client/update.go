@@ -139,19 +139,19 @@ func Update(serverURL string, state State, key, platform string, p Progress) (bo
 	}
 	p.Log("%s: binary replaced", key)
 
-	if entry.ServiceName != "" {
-		p.Log("%s: starting service %s", key, entry.ServiceName)
-		if err := StartService(entry.ServiceName); err != nil {
-			doRollback(entry, backupPath, p)
-			return false, fmt.Errorf("start service: %w", err)
-		}
-	}
-
 	if entry.PostInstall != "" {
 		p.Log("%s: running post-install: %s", key, entry.PostInstall)
 		cmd := exec.Command("sh", "-c", entry.PostInstall)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return false, fmt.Errorf("post-install: %w\n%s", err, out)
+		}
+	}
+
+	if entry.ServiceName != "" {
+		p.Log("%s: starting service %s", key, entry.ServiceName)
+		if err := StartService(entry.ServiceName); err != nil {
+			doRollback(entry, backupPath, p)
+			return false, fmt.Errorf("start service: %w", err)
 		}
 	}
 
@@ -473,10 +473,13 @@ func UpdateGH(state State, key, platform string, p Progress, pickFn func([]GHAss
 		return false, nil
 	}
 
+	var backupPath string
 	if entry.BackupDir != "" {
 		_, component, _ := SplitKey(key)
-		if _, err := backupBinary(entry.BinaryPath, entry.BackupDir, component); err != nil {
-			return false, fmt.Errorf("backup: %w", err)
+		var backupErr error
+		backupPath, backupErr = backupBinary(entry.BinaryPath, entry.BackupDir, component)
+		if backupErr != nil {
+			return false, fmt.Errorf("backup: %w", backupErr)
 		}
 	}
 
@@ -500,14 +503,14 @@ func UpdateGH(state State, key, platform string, p Progress, pickFn func([]GHAss
 
 	if entry.ServiceName != "" {
 		if err := StartService(entry.ServiceName); err != nil {
-			doRollback(entry, "", p)
+			doRollback(entry, backupPath, p)
 			return false, fmt.Errorf("start service: %w", err)
 		}
 	}
 
 	if entry.HealthCheck != "" {
 		if err := healthCheck(entry.HealthCheck); err != nil {
-			doRollback(entry, "", p)
+			doRollback(entry, backupPath, p)
 			return false, fmt.Errorf("health check: %w", err)
 		}
 	}

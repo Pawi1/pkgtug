@@ -25,6 +25,11 @@ func (s *Server) Init(ctx context.Context) {
 }
 
 func (s *Server) initPackage(ctx context.Context, name string, pkg *config.Package) {
+	if pkg.DirectPush {
+		log.Printf("init %s: direct_push — skipping git clone", name)
+		return
+	}
+
 	log.Printf("init %s: ensuring git clone at %s", name, pkg.LocalClone)
 	if err := gitops.EnsureClone(pkg.GitURL, pkg.LocalClone); err != nil {
 		log.Printf("init %s: git clone/fetch failed: %v", name, err)

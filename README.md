@@ -136,7 +136,13 @@ curl -X POST https://tug.example.com/tug/repo/myapp/push \
   -F "file=@myapp-1.2.3-x86_64.AppImage"
 ```
 
-Multiple platforms: repeat the call with a different `platform` value. The package must still be declared in `server.yaml`, but `build_command` and `binaries` are irrelevant for direct-push packages.
+Multiple platforms: repeat the call with a different `platform` value. Declare the package in `server.yaml` with `direct_push: true` — `git_url`, `build_command`, and `binaries` are not needed and not validated:
+
+```yaml
+packages:
+  - name: myapp
+    direct_push: true
+```
 
 ## Worker
 
@@ -334,7 +340,7 @@ make build-linux-amd64
 make build-linux-arm64
 ```
 
-Requires Go 1.22+. Produces fully static binaries.
+Requires Go 1.26+. Produces fully static binaries.
 
 ## Security model
 

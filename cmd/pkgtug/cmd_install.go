@@ -155,6 +155,14 @@ func (a *App) cmdInstall(args []string) error {
 	tmp.Close()
 	fmt.Println()
 
+	if bin.SHA256 != "" {
+		fmt.Print("Verifying SHA256... ")
+		if err := client.VerifySHA256File(tmpName, bin.SHA256); err != nil {
+			return fmt.Errorf("sha256 mismatch: %w", err)
+		}
+		fmt.Println("OK")
+	}
+
 	if err := os.Chmod(tmpName, 0o755); err != nil {
 		return err
 	}

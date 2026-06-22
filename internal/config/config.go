@@ -39,6 +39,7 @@ type TelegramSection struct {
 
 type Package struct {
 	Name          string        `yaml:"name"`
+	DirectPush    bool          `yaml:"direct_push"`   // skip git/build; accept binaries via POST /push only
 	GitURL        string        `yaml:"git_url"`
 	LocalClone    string        `yaml:"local_clone"`
 	VersionSource VersionSource `yaml:"version_source"`
@@ -98,8 +99,11 @@ func (c *ServerConfig) validate() error {
 			return fmt.Errorf("packages[%d]: duplicate name %q", i, pkg.Name)
 		}
 		seen[pkg.Name] = true
+		if pkg.DirectPush {
+			continue
+		}
 		if pkg.GitURL == "" {
-			return fmt.Errorf("package %q: git_url is required", pkg.Name)
+			return fmt.Errorf("package %q: git_url is required (or set direct_push: true)", pkg.Name)
 		}
 		if pkg.LocalClone == "" {
 			return fmt.Errorf("package %q: local_clone is required", pkg.Name)
