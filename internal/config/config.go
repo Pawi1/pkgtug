@@ -30,6 +30,7 @@ type ServerSection struct {
 	CORSOrigins     []string      `yaml:"cors_origins"`     // e.g. ["*"] or ["https://user.github.io"]
 	WebhookCooldown time.Duration `yaml:"webhook_cooldown"` // min gap between webhook fetches per package (default 10s)
 	MaxUploadSize   ByteSize      `yaml:"max_upload_size"`  // max size per uploaded file; 0 = unlimited
+	KeepVersions    int           `yaml:"keep_versions"`    // number of old versions to retain per package; 0 = unlimited
 }
 
 type TelegramSection struct {
@@ -39,9 +40,10 @@ type TelegramSection struct {
 
 type Package struct {
 	Name          string        `yaml:"name"`
-	DirectPush    bool          `yaml:"direct_push"`   // skip git/build; accept binaries via POST /push only
-	SourceURL     string        `yaml:"source_url"`    // project URL exposed in manifest; falls back to git_url
+	DirectPush    bool          `yaml:"direct_push"`    // skip git/build; accept binaries via POST /push only
+	SourceURL     string        `yaml:"source_url"`     // project URL exposed in manifest; falls back to git_url
 	DownloadToken string        `yaml:"download_token"` // if set, binary downloads require Authorization: Bearer <token>
+	KeepVersions  int           `yaml:"keep_versions"`  // overrides server.keep_versions for this package; 0 = use global
 	GitURL        string        `yaml:"git_url"`
 	LocalClone    string        `yaml:"local_clone"`
 	VersionSource VersionSource `yaml:"version_source"`

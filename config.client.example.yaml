@@ -1,8 +1,15 @@
 remotes:
   - name: main
     url: https://tug.example.com
+    # token: "change-me"   # optional — required if server has download_token set for packages
   - name: community
     url: https://tug.community.example.com
+
+# meta_urls: list of hosted JSON files that provide additional remotes (fallbacks, mirrors)
+# Each meta-manifest is a JSON file with: {"remotes": [{"name": "...", "url": "...", "priority": 1}]}
+# Lower priority number = tried first. Local remotes always take precedence over meta-provided ones.
+# meta_urls:
+#   - https://example.github.io/pkgtug-remotes/remotes.json
 
 telegram:          # optional — leave empty to disable
   bot_token: ""

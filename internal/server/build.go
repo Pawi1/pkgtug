@@ -174,7 +174,57 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 		s.cfg.Server.BaseURL, pkgName, version, platform, component)
 	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: sum, Size: size, Compressed: compressed}
 
-	return manifest.WriteAtomic(mfPath, mf)
+	if err := manifest.WriteAtomic(mfPath, mf); err != nil {
+		return err
+	}
+
+	s.pruneOldVersions(pkgName, version)
+	return nil
+}
+
+// pruneOldVersions removes old version directories beyond the configured keep limit.
+// The current version is always kept. Directories are sorted lexicographically and
+// the oldest (lowest sort order) are removed first.
+func (s *Server) pruneOldVersions(pkgName, currentVersion string) {
+	keep := s.cfg.Server.KeepVersions
+	if pkg, ok := s.packages[pkgName]; ok && pkg.KeepVersions > 0 {
+		keep = pkg.KeepVersions
+	}
+	if keep <= 0 {
+		return // unlimited
+	}
+
+	pkgRoot := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName)
+	entries, err := os.ReadDir(pkgRoot)
+	if err != nil {
+		return
+	}
+
+	var versions []string
+	for _, e := range entries {
+		if e.IsDir() {
+			versions = append(versions, e.Name())
+		}
+	}
+	// versions are sorted ascending by os.ReadDir; remove from the front (oldest first)
+	// always keep currentVersion regardless of position
+	toDelete := len(versions) - keep
+	deleted := 0
+	for _, v := range versions {
+		if deleted >= toDelete {
+			break
+		}
+		if v == currentVersion {
+			continue
+		}
+		dir := filepath.Join(pkgRoot, v)
+		if err := os.RemoveAll(dir); err != nil {
+			log.Printf("prune %s/%s: %v", pkgName, v, err)
+		} else {
+			log.Printf("prune %s/%s: removed (keep_versions=%d)", pkgName, v, keep)
+			deleted++
+		}
+	}
 }
 
 // saveFile writes src to dst and returns the SHA-256 hex digest and byte count of the written data.

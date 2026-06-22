@@ -32,9 +32,10 @@ const exampleConfig = `server:
   data_dir: "./data"
   worker_secret: "change-me"
 # cors_origins:
-#   - "*"
+#   - "*"   # required for the browser UI; restrict to your domain if preferred
   webhook_cooldown: "10s"
-  # max_upload_size: "100MB"
+  # max_upload_size: "100MB"  # limit per-file upload size; 0 = unlimited
+  # keep_versions: 5          # old versions to retain per package; 0 = unlimited (default)
 
 # worker: run a local build worker inside the server process
 # worker:
@@ -49,6 +50,9 @@ const exampleConfig = `server:
 packages:
   - name: myapp
     git_url: "https://github.com/example/myapp.git"
+    # source_url: "https://github.com/example/myapp"  # project URL shown in manifest and browser UI
+    # download_token: "secret"                         # require Bearer token for binary downloads
+    # keep_versions: 10                                # per-package override; 0 = use server default
     local_clone: "./clones/myapp"
     version_source:
       type: tag
@@ -59,6 +63,12 @@ packages:
         path: myapp
     poll_interval: "5m"
     # compress: xz
+
+  # direct_push example — no git/build required
+  # - name: myapp-appimage
+  #   direct_push: true
+  #   source_url: "https://github.com/example/myapp"
+  #   # download_token: "secret"
 `
 
 func main() {

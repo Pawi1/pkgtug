@@ -8,6 +8,7 @@ server:
     # or restrict: - "https://youruser.github.io"
   webhook_cooldown: "10s"   # min gap between webhook fetches per package (default 10s)
   # max_upload_size: "100MB"  # optional — limit per-file upload size (e.g. Cloudflare Tunnel cap)
+  # keep_versions: 5          # optional — old versions to retain per package; 0 = unlimited (default)
 
 telegram:
   bot_token: ""
@@ -16,6 +17,7 @@ telegram:
 packages:
   - name: vnet-mcp
     git_url: git@gitlab.example.com:user/vnet-mcp.git
+    source_url: https://gitlab.example.com/user/vnet-mcp   # optional: shown in manifest and browser UI
     local_clone: /data/repos/vnet-mcp
     version_source:
       type: tag
@@ -30,6 +32,8 @@ packages:
 
   - name: myservice
     git_url: git@github.com:user/myservice.git
+    source_url: https://github.com/user/myservice   # optional: project/repo URL exposed in manifest
+    # download_token: "change-me"                   # optional: require Bearer token for binary downloads
     local_clone: /data/repos/myservice
     version_source:
       type: branch
@@ -38,3 +42,9 @@ packages:
     binaries:
       - component: server
         path: dist/myservice
+
+  - name: myapp-appimage
+    direct_push: true   # no git/build — accept binaries via POST /tug/repo/<name>/push
+    source_url: https://github.com/user/myapp
+    # download_token: "change-me"   # optional: protect downloads with a token
+    # keep_versions: 3              # optional: per-package override for version retention

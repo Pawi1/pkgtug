@@ -1,4 +1,4 @@
-<img src="https://pawi1.github.io/pkgtug/pkgtug.svg" alt="pkgtug" width="96">
+<img src="https://pawi1.github.io/pkgtug/pkgtug.svg?v=2" alt="pkgtug" width="96">
 
 # pkgtug
 
@@ -48,6 +48,7 @@ server:
     - "*"              # required for the browser UI; restrict to your domain if preferred
   webhook_cooldown: "10s"    # min gap between webhook fetches per package (default 10s)
   # max_upload_size: "100MB" # optional — limit per-file upload (e.g. for Cloudflare Tunnel)
+  # keep_versions: 5         # optional — number of old versions to keep per package; 0 = unlimited (default)
 
 telegram:          # optional — leave empty to disable
   bot_token: ""
@@ -56,6 +57,9 @@ telegram:          # optional — leave empty to disable
 packages:
   - name: myapp
     git_url: git@github.com:user/myapp.git
+    source_url: https://github.com/user/myapp   # optional: shown in manifest and browser UI
+    # download_token: "secret"                  # optional: require Bearer token for binary downloads
+    # keep_versions: 10                         # optional: override server.keep_versions for this package
     local_clone: /data/repos/myapp
     version_source:
       type: tag          # track semver/date tags
@@ -99,8 +103,9 @@ On startup the server:
 |----------|------|-------------|
 | `GET /healthz` | none | Server health and current version per package |
 | `POST /tug/fetch/<name>` | none | Trigger git fetch; safe to use as a native GitHub/GitLab webhook |
-| `GET /tug/repo/<name>/manifest.json` | none | Latest manifest for a package |
-| `GET /tug/repo/<name>/binaries/<ver>/<platform>/<component>` | none | Download a binary |
+| `GET /tug/repo/<name>/manifest.json` | none | Latest manifest (`version`, `source_url`, `auth_required`, `binaries` with `url`/`sha256`/`size`) |
+| `GET /tug/repo/<name>/versions` | none | List of stored versions, newest first |
+| `GET /tug/repo/<name>/binaries/<ver>/<platform>/<component>` | none (or Bearer token if `download_token` set) | Download a binary; use `:latest` as version alias |
 | `GET /tug/packages` | none | List tracked packages and their current versions |
 | `POST /tug/repo/<name>/push` | Bearer secret | Push a pre-built binary directly (AppImage, etc.) |
 | `GET /tug/build/next?platform=<p>` | Bearer secret | Worker: claim next pending job |
@@ -144,6 +149,8 @@ Multiple platforms: repeat the call with a different `platform` value. Declare t
 packages:
   - name: myapp
     direct_push: true
+    source_url: https://github.com/user/myapp   # optional
+    # download_token: "secret"                  # optional
 ```
 
 ## Worker
@@ -191,12 +198,35 @@ pkgtug supports multiple package servers (remotes), similar to Flatpak.
 
 ```sh
 pkgtug remote add main    https://tug.example.com
-pkgtug remote add nightly https://tug-nightly.example.com
+pkgtug remote add private https://tug.example.com mytoken   # with download token
+pkgtug remote set-token main mytoken                         # set/update token later
+pkgtug remote set-token main                                 # clear token
 pkgtug remote list
 pkgtug remote remove nightly
 ```
 
 Remotes are stored in `/etc/pkgtug/config.yaml` and managed by the CLI.
+
+#### Meta-remotes
+
+A meta-remote is a JSON file hosted anywhere (GitHub Pages, gist, static server) that lists additional remotes. Useful for sharing a public registry or providing fallback mirrors:
+
+```json
+{
+  "remotes": [
+    { "name": "prod",   "url": "https://tug.example.com",        "priority": 1 },
+    { "name": "mirror", "url": "https://tug-mirror.example.com", "priority": 2 }
+  ]
+}
+```
+
+```sh
+pkgtug remote meta add https://example.github.io/pkgtug-remotes/remotes.json
+pkgtug remote meta list
+pkgtug remote meta remove <url>
+```
+
+Locally-configured remotes always take precedence over meta-provided ones. Failed meta fetches are silently skipped.
 
 ### Usage
 
@@ -348,7 +378,8 @@ Requires Go 1.26+. Produces fully static binaries.
 
 - The webhook endpoint has **no authentication** — it only runs `git fetch` on a local clone. Safe to expose publicly. Repeated calls within the cooldown window are rate-limited (default 10 s).
 - Worker endpoints require `Authorization: Bearer <worker_secret>`. Workers write data that is later served to all clients, so they must be trusted.
-- Client endpoints (manifest, binary download) have **no authentication** — treat them like a package mirror.
+- Manifest and package list endpoints are always public — clients need them to discover what's available.
+- Binary downloads are **public by default**. Set `download_token` on a package to require `Authorization: Bearer <token>` (or `?token=` query param). The manifest will advertise `auth_required: true` so clients know a token is needed.
 - GitHub Releases downloads go directly to `github.com` / `objects.githubusercontent.com`. Set `GITHUB_TOKEN` to authenticate private repos. Checksums are verified automatically when provided by the release.
 
 ## License
