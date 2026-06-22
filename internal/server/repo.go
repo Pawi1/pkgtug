@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +74,38 @@ func (s *Server) handleBinaryDownload(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	http.ServeFile(w, r, binPath)
+}
+
+// handleVersionList returns the list of stored versions for a package, newest first.
+func (s *Server) handleVersionList(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if _, ok := s.packages[name]; !ok {
+		http.Error(w, "package not found", http.StatusNotFound)
+		return
+	}
+
+	pkgDir := filepath.Join(s.cfg.Server.DataDir, "packages", name)
+	entries, err := os.ReadDir(pkgDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("[]"))
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	var versions []string
+	for _, e := range entries {
+		if e.IsDir() {
+			versions = append(versions, e.Name())
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(versions)))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(versions)
 }
 
 // handlePackageList returns the list of tracked packages and their current version.
