@@ -9,16 +9,16 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:       #0e0c0a;
-    --surface:  #191510;
-    --border:   #2e2820;
-    --text:     #f0ebe3;
-    --muted:    #7c7169;
+    --bg:       #fdf6e9;
+    --surface:  #f5e6c8;
+    --border:   #d4b896;
+    --text:     #1a0e00;
+    --muted:    #8b6840;
     --accent:   #c97c1a;
-    --accent2:  #e8a84a;
-    --green:    #34d399;
-    --yellow:   #fbbf24;
-    --red:      #f87171;
+    --accent2:  #a05c0a;
+    --green:    #1a7a4d;
+    --yellow:   #8a5e00;
+    --red:      #a83232;
     --radius:   8px;
     --mono:     'JetBrains Mono', 'Fira Code', monospace;
   }
@@ -171,9 +171,9 @@
     animation: fadeIn .15s ease;
   }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-  #status.error   { background: #2d1a1a; border: 1px solid var(--red);    color: var(--red);    display: flex; }
-  #status.info    { background: #1c1509; border: 1px solid var(--accent);  color: var(--accent2); display: flex; }
-  #status.success { background: #1a2d24; border: 1px solid var(--green);   color: var(--green);  display: flex; }
+  #status.error   { background: #fde8e8; border: 1px solid var(--red);    color: var(--red);    display: flex; }
+  #status.info    { background: #fef3d8; border: 1px solid var(--accent);  color: var(--accent2); display: flex; }
+  #status.success { background: #e3f5ee; border: 1px solid var(--green);   color: var(--green);  display: flex; }
   #status-msg { flex: 1; }
   #status-close {
     background: transparent; border: none; color: inherit;
@@ -206,7 +206,7 @@
   .h-dot.err { background: var(--red);   box-shadow: 0 0 6px var(--red); }
 
   .h-chip {
-    background: rgba(255,255,255,.05);
+    background: rgba(0,0,0,.05);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 2px 8px;
@@ -236,7 +236,7 @@
     border-radius: var(--radius);
     margin-bottom: 8px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
     transition: border-color .15s;
   }
   .pkg-card:hover { border-color: rgba(201,124,26,.4); }
@@ -535,7 +535,7 @@
     padding: 24px 28px;
     max-width: 420px;
     width: 90%;
-    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    box-shadow: 0 8px 32px rgba(0,0,0,.2);
   }
   .modal h2 {
     font-size: 16px;
