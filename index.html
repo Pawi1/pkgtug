@@ -630,6 +630,12 @@ let _statusTimer = null;
   const s = params.get('server') || localStorage.getItem('pkgtug_server') || 'https://tug.rutkow.eu';
   document.getElementById('server-input').value = s;
   if (s) { serverURL = s.replace(/\/$/, ''); loadPackages(); }
+
+  const gh = params.get('gh');
+  if (gh) {
+    document.getElementById('gh-input').value = gh;
+    searchGHReleases();
+  }
 })();
 
 // ── connect ───────────────────────────────────────────────────────────────────
@@ -1110,6 +1116,9 @@ async function searchGHReleases() {
     return;
   }
   const repo = match[1].replace(/\.git$/, '');
+  const url = new URL(location.href);
+  url.searchParams.set('gh', repo);
+  history.replaceState(null, '', url);
   const resultsEl = document.getElementById('gh-results');
   resultsEl.innerHTML = '<span class="spinner"></span>';
 
