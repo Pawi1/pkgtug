@@ -1,0 +1,417 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9][0-9].[0-9][0-9].[0-9][0-9]-stable'
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+
+  # ── Linux amd64 ───────────────────────────────────────────────────────────────
+  build-linux-amd64:
+    name: Build — linux-amd64
+    runs-on: ubuntu-latest
+    if: ${{ vars.RELEASE_BUILD_ALL == 'true' || (vars.RELEASE_TARGETS != '' && contains(fromJSON(vars.RELEASE_TARGETS), 'linux-amd64')) }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          LDFLAGS="-X main.version=${VERSION} -s -w"
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-server-linux-amd64 ./cmd/pkgtug-server
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-worker-linux-amd64 ./cmd/pkgtug-worker
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-linux-amd64        ./cmd/pkgtug
+
+      - name: Smoke test
+        run: |
+          cd dist
+          CFG=$(mktemp /tmp/pkgtug-XXXXXX.yaml); rm "$CFG"
+          ./pkgtug-server-linux-amd64 --config "$CFG"
+          rm -f "$CFG"
+          echo "server: OK"
+          for bin in ./pkgtug-worker-linux-amd64 ./pkgtug-linux-amd64; do
+            [ -x "$bin" ] || { echo "FAIL: $bin not executable"; exit 1; }
+            set +e; timeout 3 "$bin" --help >/tmp/smoke.log 2>&1; e=$?; set -e
+            [ $e -eq 126 ] && { echo "FAIL $bin: not executable"; exit 1; }
+            [ $e -eq 127 ] && { echo "FAIL $bin: not found"; exit 1; }
+            echo "$bin: OK (exit $e)"
+          done
+
+      - if: failure()
+        name: Cancel run on failure
+        continue-on-error: true
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64
+          path: dist/
+
+  # ── Linux arm64 ───────────────────────────────────────────────────────────────
+  build-linux-arm64:
+    name: Build — linux-arm64
+    runs-on: ubuntu-24.04-arm
+    if: ${{ vars.RELEASE_BUILD_ALL == 'true' || (vars.RELEASE_TARGETS != '' && contains(fromJSON(vars.RELEASE_TARGETS), 'linux-arm64')) }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          LDFLAGS="-X main.version=${VERSION} -s -w"
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-server-linux-arm64 ./cmd/pkgtug-server
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-worker-linux-arm64 ./cmd/pkgtug-worker
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-linux-arm64        ./cmd/pkgtug
+
+      - name: Smoke test
+        run: |
+          cd dist
+          CFG=$(mktemp /tmp/pkgtug-XXXXXX.yaml); rm "$CFG"
+          ./pkgtug-server-linux-arm64 --config "$CFG"
+          rm -f "$CFG"
+          echo "server: OK"
+          for bin in ./pkgtug-worker-linux-arm64 ./pkgtug-linux-arm64; do
+            [ -x "$bin" ] || { echo "FAIL: $bin not executable"; exit 1; }
+            set +e; timeout 3 "$bin" --help >/tmp/smoke.log 2>&1; e=$?; set -e
+            [ $e -eq 126 ] && { echo "FAIL $bin: not executable"; exit 1; }
+            [ $e -eq 127 ] && { echo "FAIL $bin: not found"; exit 1; }
+            echo "$bin: OK (exit $e)"
+          done
+
+      - if: failure()
+        name: Cancel run on failure
+        continue-on-error: true
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: dist/
+
+  # ── Linux arm (armv7) ─────────────────────────────────────────────────────────
+  build-linux-arm:
+    name: Build — linux-arm
+    runs-on: ubuntu-latest
+    if: ${{ vars.RELEASE_BUILD_ALL == 'true' || (vars.RELEASE_TARGETS != '' && contains(fromJSON(vars.RELEASE_TARGETS), 'linux-arm')) }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: linux
+          GOARCH: arm
+          GOARM: "7"
+          CGO_ENABLED: "0"
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          LDFLAGS="-X main.version=${VERSION} -s -w"
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-server-linux-arm ./cmd/pkgtug-server
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-worker-linux-arm ./cmd/pkgtug-worker
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-linux-arm        ./cmd/pkgtug
+
+      - name: Verify artifacts
+        run: |
+          for bin in dist/pkgtug-server-linux-arm dist/pkgtug-worker-linux-arm dist/pkgtug-linux-arm; do
+            [ -f "$bin" ] || { echo "FAIL: $bin not found"; exit 1; }
+            file "$bin" | grep -q "ARM" || { echo "FAIL: $bin wrong arch"; exit 1; }
+            echo "$bin: OK"
+          done
+
+      - if: failure()
+        name: Cancel run on failure
+        continue-on-error: true
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm
+          path: dist/
+
+  # ── macOS amd64 ───────────────────────────────────────────────────────────────
+  build-darwin-amd64:
+    name: Build — darwin-amd64
+    runs-on: macos-latest
+    if: ${{ vars.RELEASE_BUILD_ALL == 'true' || (vars.RELEASE_TARGETS != '' && contains(fromJSON(vars.RELEASE_TARGETS), 'darwin-amd64')) }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          LDFLAGS="-X main.version=${VERSION} -s -w"
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-server-darwin-amd64 ./cmd/pkgtug-server
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-worker-darwin-amd64 ./cmd/pkgtug-worker
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-darwin-amd64        ./cmd/pkgtug
+
+      - name: Smoke test
+        run: |
+          cd dist
+          CFG=$(mktemp /tmp/pkgtug-XXXXXX.yaml); rm "$CFG"
+          ./pkgtug-server-darwin-amd64 --config "$CFG"
+          rm -f "$CFG"
+          echo "server: OK"
+          for bin in ./pkgtug-worker-darwin-amd64 ./pkgtug-darwin-amd64; do
+            [ -x "$bin" ] || { echo "FAIL: $bin not executable"; exit 1; }
+            set +e; timeout 3 "$bin" --help >/tmp/smoke.log 2>&1; e=$?; set -e
+            [ $e -eq 126 ] && { echo "FAIL $bin: not executable"; exit 1; }
+            [ $e -eq 127 ] && { echo "FAIL $bin: not found"; exit 1; }
+            echo "$bin: OK (exit $e)"
+          done
+
+      - if: failure()
+        name: Cancel run on failure
+        continue-on-error: true
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin-amd64
+          path: dist/
+
+  # ── macOS arm64 ───────────────────────────────────────────────────────────────
+  build-darwin-arm64:
+    name: Build — darwin-arm64
+    runs-on: macos-latest
+    if: ${{ vars.RELEASE_BUILD_ALL == 'true' || (vars.RELEASE_TARGETS != '' && contains(fromJSON(vars.RELEASE_TARGETS), 'darwin-arm64')) }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          LDFLAGS="-X main.version=${VERSION} -s -w"
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-server-darwin-arm64 ./cmd/pkgtug-server
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-worker-darwin-arm64 ./cmd/pkgtug-worker
+          go build -ldflags "$LDFLAGS" -o dist/pkgtug-darwin-arm64        ./cmd/pkgtug
+
+      - name: Smoke test
+        run: |
+          cd dist
+          CFG=$(mktemp /tmp/pkgtug-XXXXXX.yaml); rm "$CFG"
+          ./pkgtug-server-darwin-arm64 --config "$CFG"
+          rm -f "$CFG"
+          echo "server: OK"
+          for bin in ./pkgtug-worker-darwin-arm64 ./pkgtug-darwin-arm64; do
+            [ -x "$bin" ] || { echo "FAIL: $bin not executable"; exit 1; }
+            set +e; timeout 3 "$bin" --help >/tmp/smoke.log 2>&1; e=$?; set -e
+            [ $e -eq 126 ] && { echo "FAIL $bin: not executable"; exit 1; }
+            [ $e -eq 127 ] && { echo "FAIL $bin: not found"; exit 1; }
+            echo "$bin: OK (exit $e)"
+          done
+
+      - if: failure()
+        name: Cancel run on failure
+        continue-on-error: true
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin-arm64
+          path: dist/
+
+  # ── GitHub Release ─────────────────────────────────────────────────────────────
+  release:
+    name: Publish release
+    needs: [build-linux-amd64, build-linux-arm64, build-linux-arm, build-darwin-amd64, build-darwin-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
+      - name: SHA256SUMS
+        run: |
+          cd artifacts
+          find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS
+
+      - name: Build release body
+        id: body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          TAG="${{ github.ref_name }}"
+
+          TAG_MSG=$(git tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN PGP/,/^-----END PGP/d' | sed '/^$/d')
+
+          PREV=$(git tag --sort=-version:refname \
+            | grep -E '^[0-9]{2}\.[0-9]{2}\.[0-9]{1,2}-stable$' \
+            | grep -v "^${TAG}$" | head -1)
+
+          CHANGED=""
+          COMMIT_LOG=""
+          if [ -n "$PREV" ]; then
+            CHANGED=$(git diff --name-only "$PREV" HEAD 2>/dev/null || true)
+            COMMIT_LOG=$(git log --oneline "$PREV..HEAD" 2>/dev/null | head -40 || true)
+          fi
+
+          HINTS=""
+          echo "$CHANGED" | grep -qE "internal/config/config\.go|config\.example\.yaml|config\.client\.example\.yaml" && \
+            HINTS="${HINTS}\n- ⚙️ **Config format updated** — check example files for new fields before upgrading"
+          echo "$CHANGED" | grep -q "internal/manifest/manifest\.go" && \
+            HINTS="${HINTS}\n- 📄 **Manifest format updated** — clients older than this release may not read all fields; upgrade pkgtug before pkgtug-server"
+          echo "$CHANGED" | grep -q "internal/server/state\.go" && \
+            HINTS="${HINTS}\n- 🗄️ **Server state format updated** — backup \`server-state.json\` before upgrading"
+          echo "$CHANGED" | grep -q "go\.mod" && \
+            HINTS="${HINTS}\n- 📦 **Go module updated** — pre-built binaries are self-contained; no action needed"
+
+          PREV_PARAM=""
+          [ -n "$PREV" ] && PREV_PARAM="-f previous_tag_name=${PREV}"
+          CHANGELOG=$(gh api --method POST \
+            /repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="$TAG" $PREV_PARAM \
+            --jq '.body' 2>/dev/null || echo "")
+
+          AI_BODY=""
+          if [ -n "$DEEPSEEK_API_KEY" ]; then
+            PROMPT=$(cat <<__PROMPT__
+          You are writing release notes for a GitHub release of pkgtug — a self-hosted binary package manager and auto-updater. It has three components: pkgtug-server (webhook receiver, job queue, manifest API, binary storage), pkgtug-worker (polls server for build jobs, runs builds, uploads results), and pkgtug (client CLI that installs and auto-updates binaries on production hosts).
+
+          IMPORTANT RULES:
+          - Do NOT start with any heading. Do not use the version tag or number as a heading.
+          - Ignore ALL changes under .github/ — internal CI, must not appear in release notes.
+          - Only describe changes that affect users or operators.
+          - If there is nothing meaningful to report, write a single sentence saying this release contains only internal changes.
+          - Skip any section entirely if it has nothing to say — do not write "None" or empty bullets.
+
+          Write professional, concise release notes in English (GitHub Markdown). Structure:
+          1. One short paragraph summarising what changed and why it matters (no heading). Skip if only CI changes.
+          2. What's new — only if there are user-visible features; skip if none.
+          3. Bug fixes — only if there are user-facing fixes; skip if none.
+          4. Breaking changes — only if any; skip if none.
+
+          Be specific. Base everything strictly on the data below. Don't invent things. Don't include the migration checklist.
+
+          Tag: ${TAG}
+          Previous tag: ${PREV:-none}
+
+          Developer notes (tag annotation):
+          ${TAG_MSG:-none}
+
+          Commits since previous release:
+          ${COMMIT_LOG:-none}
+
+          Changed files:
+          ${CHANGED:-none}
+          __PROMPT__
+            )
+            PROMPT_JSON=$(printf '%s' "$PROMPT" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+            PAYLOAD=$(printf '{"model":"deepseek-chat","max_tokens":4096,"temperature":0.3,"messages":[{"role":"user","content":%s}]}' "$PROMPT_JSON")
+            AI_BODY=$(curl -s \
+              -H "Authorization: Bearer ${DEEPSEEK_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" \
+              --max-time 120 \
+              https://api.deepseek.com/chat/completions \
+              | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message'].get('content',''))" \
+              2>/dev/null || echo "")
+            AI_BODY=$(printf '%s' "$AI_BODY" | sed '/^## [0-9]/d')
+          fi
+
+          {
+            echo "body<<__RELEASE_BODY__"
+
+            if [ -n "$AI_BODY" ]; then
+              printf '%s\n\n' "$AI_BODY"
+            elif [ -n "$TAG_MSG" ]; then
+              printf '## Release notes\n\n%s\n\n' "$TAG_MSG"
+            fi
+
+            if [ -n "$HINTS" ]; then
+              printf '## Update checklist\n'
+              printf '%b\n' "$HINTS"
+              printf '\n> Restart pkgtug-server (and pkgtug-worker if running as daemon) after upgrade.\n\n'
+            else
+              printf 'No migration steps required — drop-in upgrade. Restart pkgtug-server.\n\n'
+            fi
+
+            [ -n "$CHANGELOG" ] && printf '%s\n\n%s\n' "---" "$CHANGELOG"
+
+            echo "__RELEASE_BODY__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.body.outputs.body }}
+          files: artifacts/**/*
+
+  # ── Cleanup on failure ─────────────────────────────────────────────────────────
+  cleanup:
+    name: Delete tag on failure
+    needs: [build-linux-amd64, build-linux-arm64, build-linux-arm, build-darwin-amd64, build-darwin-arm64, release]
+    if: failure() || cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete tag ${{ github.ref_name }}
+        run: |
+          echo "Deleting tag ${{ github.ref_name }} due to workflow failure"
+          gh api --method DELETE /repos/${{ github.repository }}/git/refs/tags/${{ github.ref_name }}
+        env:
+          GH_TOKEN: ${{ github.token }}
