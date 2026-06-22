@@ -939,8 +939,11 @@ function renderComponents(container, name, mf, selectedVersion, components) {
         copyShaBtn.disabled = true;
       }
 
+      const sizeEl = el('span', 'gh-asset-size');
+      sizeEl.textContent = isCurrentVersion && bin.size ? fmtBytes(bin.size) : '';
+
       actions.append(dlBtn, copyUrlBtn, copyShaBtn);
-      row.append(tag, sha, actions);
+      row.append(tag, sha, sizeEl, actions);
       section.appendChild(row);
     }
     container.appendChild(section);
