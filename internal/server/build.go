@@ -39,15 +39,16 @@ func (s *Server) handleBuildNext(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		j := &Job{
-			ID:           randomID(),
-			PackageName:  name,
-			GitURL:       pkg.GitURL,
-			Version:      version,
-			BuildCommand: pkg.BuildCommand,
-			Binaries:     pkg.Binaries,
-			Platform:     platform,
-			Compress:     pkg.Compress,
-			ClaimedAt:    time.Now(),
+			ID:              randomID(),
+			PackageName:     name,
+			GitURL:          pkg.GitURL,
+			Version:         version,
+			PreBuildCommand: pkg.PreBuildCommand,
+			BuildCommand:    pkg.BuildCommand,
+			Binaries:        pkg.Binaries,
+			Platform:        platform,
+			Compress:        pkg.Compress,
+			ClaimedAt:       time.Now(),
 		}
 		state.claimJob(platform, j)
 		s.jobs.add(j)

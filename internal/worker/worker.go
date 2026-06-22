@@ -31,13 +31,14 @@ type Config struct {
 }
 
 type job struct {
-	ID           string          `json:"job_id"`
-	PackageName  string          `json:"package"`
-	GitURL       string          `json:"git_url"`
-	Version      string          `json:"version"`
-	BuildCommand string          `json:"build_command"`
-	Binaries     []config.Binary `json:"binaries"`
-	Compress     string          `json:"compress,omitempty"`
+	ID              string          `json:"job_id"`
+	PackageName     string          `json:"package"`
+	GitURL          string          `json:"git_url"`
+	Version         string          `json:"version"`
+	PreBuildCommand string          `json:"pre_build_command,omitempty"`
+	BuildCommand    string          `json:"build_command"`
+	Binaries        []config.Binary `json:"binaries"`
+	Compress        string          `json:"compress,omitempty"`
 }
 
 // ErrNoJob is returned by RunOnce when the server has no pending jobs.
@@ -137,6 +138,13 @@ func runJob(ctx context.Context, client *http.Client, cfg Config, j *job) error 
 	log.Printf("worker [%s]: checkout %s", j.ID, j.Version)
 	if err := gitops.Checkout(cloneDir, j.Version); err != nil {
 		return postError(ctx, client, cfg, j, fmt.Sprintf("git checkout: %v", err))
+	}
+
+	if j.PreBuildCommand != "" {
+		log.Printf("worker [%s]: running pre-build: %s", j.ID, j.PreBuildCommand)
+		if err := runBuild(ctx, cloneDir, j.PreBuildCommand); err != nil {
+			return postError(ctx, client, cfg, j, fmt.Sprintf("pre-build failed: %v", err))
+		}
 	}
 
 	log.Printf("worker [%s]: running build: %s", j.ID, j.BuildCommand)

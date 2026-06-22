@@ -47,6 +47,7 @@ type Package struct {
 	GitURL        string        `yaml:"git_url"`
 	LocalClone    string        `yaml:"local_clone"`
 	VersionSource VersionSource `yaml:"version_source"`
+	PreBuildCommand string      `yaml:"pre_build_command"` // optional; runs in the clone dir before build_command
 	BuildCommand  string        `yaml:"build_command"`
 	Binaries      []Binary      `yaml:"binaries"`
 	PollInterval  time.Duration `yaml:"poll_interval"` // 0 = disabled; e.g. "5m"

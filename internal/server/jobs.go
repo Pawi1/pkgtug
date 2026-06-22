@@ -17,6 +17,7 @@ type Job struct {
 	PackageName  string          `json:"package"`
 	GitURL       string          `json:"git_url"`
 	Version      string          `json:"version"`
+	PreBuildCommand string       `json:"pre_build_command,omitempty"`
 	BuildCommand string          `json:"build_command"`
 	Binaries     []config.Binary `json:"binaries"`
 	Platform     string          `json:"platform"`
