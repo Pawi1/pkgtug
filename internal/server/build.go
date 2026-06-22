@@ -136,13 +136,18 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 			return fmt.Errorf("invalid upload field: %w", err)
 		}
 	}
+	// filepath.Base strips any remaining path prefix — defence in depth on top of validPathComponent,
+	// and the form that path-injection analyzers recognise as a sanitizer.
+	pkgName = filepath.Base(pkgName)
+	version = filepath.Base(version)
+	platform = filepath.Base(platform)
+	component = filepath.Base(component)
 
 	pkgRoot := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName)
 	pkgDir := filepath.Join(pkgRoot, version, platform)
 	if err := underRoot(pkgRoot, filepath.Join(pkgDir, component)); err != nil {
 		return fmt.Errorf("path traversal detected: %w", err)
 	}
-	// codeql[go/path-injection] - all segments validated by validPathComponent and underRoot above
 	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
 		return err
 	}
@@ -231,7 +236,6 @@ func (s *Server) pruneOldVersions(pkgName, currentVersion string) {
 // saveFile writes src to dst and returns the SHA-256 hex digest and byte count of the written data.
 // Computing the hash during the write avoids a second read of a user-supplied path.
 func saveFile(src io.Reader, dst string) (string, int64, error) {
-	// codeql[go/path-injection] - dst is derived from segments pre-validated by storeBinary callers
 	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
 	if err != nil {
 		return "", 0, err
