@@ -50,5 +50,6 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 
 func isPublicEndpoint(path string) bool {
 	return strings.HasPrefix(path, "/tug/repo/") ||
-		path == "/tug/packages"
+		path == "/tug/packages" ||
+		path == "/healthz"
 }
