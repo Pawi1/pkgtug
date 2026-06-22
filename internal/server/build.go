@@ -147,7 +147,7 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 	}
 
 	destPath := filepath.Join(pkgDir, component)
-	sum, err := saveFile(src, destPath)
+	sum, size, err := saveFile(src, destPath)
 	if err != nil {
 		return fmt.Errorf("save %s: %w", component, err)
 	}
@@ -171,25 +171,26 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 	}
 	url := fmt.Sprintf("%s/tug/repo/%s/binaries/%s/%s/%s",
 		s.cfg.Server.BaseURL, pkgName, version, platform, component)
-	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: sum, Compressed: compressed}
+	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: sum, Size: size, Compressed: compressed}
 
 	return manifest.WriteAtomic(mfPath, mf)
 }
 
-// saveFile writes src to dst and returns the SHA-256 hex digest of the written bytes.
+// saveFile writes src to dst and returns the SHA-256 hex digest and byte count of the written data.
 // Computing the hash during the write avoids a second read of a user-supplied path.
-func saveFile(src io.Reader, dst string) (string, error) {
+func saveFile(src io.Reader, dst string) (string, int64, error) {
 	// codeql[go/path-injection] - dst is derived from segments pre-validated by storeBinary callers
 	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	defer f.Close()
 	h := sha256.New()
-	if _, err = io.Copy(io.MultiWriter(f, h), src); err != nil {
-		return "", err
+	n, err := io.Copy(io.MultiWriter(f, h), src)
+	if err != nil {
+		return "", 0, err
 	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(h.Sum(nil)), n, nil
 }
 
 func sha256File(path string) (string, error) {
