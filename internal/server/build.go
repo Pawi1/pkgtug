@@ -158,6 +158,14 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 		return fmt.Errorf("load manifest: %w", err)
 	}
 	mf.Version = version
+	if pkg, ok := s.packages[pkgName]; ok {
+		switch {
+		case pkg.SourceURL != "":
+			mf.SourceURL = pkg.SourceURL
+		case pkg.GitURL != "":
+			mf.SourceURL = pkg.GitURL
+		}
+	}
 	if mf.Binaries[component] == nil {
 		mf.Binaries[component] = make(map[string]manifest.Binary)
 	}

@@ -40,6 +40,7 @@ type TelegramSection struct {
 type Package struct {
 	Name          string        `yaml:"name"`
 	DirectPush    bool          `yaml:"direct_push"`   // skip git/build; accept binaries via POST /push only
+	SourceURL     string        `yaml:"source_url"`    // project URL exposed in manifest; falls back to git_url
 	GitURL        string        `yaml:"git_url"`
 	LocalClone    string        `yaml:"local_clone"`
 	VersionSource VersionSource `yaml:"version_source"`
