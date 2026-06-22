@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Tugboat cardboard box icon">
+  <rect width="1024" height="1024" fill="#fff"/>
+
+  <g fill="none" stroke="#1a1a1a" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- hull body -->
+    <polygon points="180,490 380,440 640,440 840,490 820,740 200,740" fill="#f5e6c8" stroke="#1a1a1a" stroke-width="22"/>
+
+    <!-- vertical dividers -->
+    <line x1="380" y1="440" x2="380" y2="740" stroke="#1a1a1a" stroke-width="22"/>
+    <line x1="640" y1="440" x2="640" y2="740" stroke="#1a1a1a" stroke-width="22"/>
+
+    <!-- top flaps -->
+    <polygon points="180,490 380,440 380,420 200,470" fill="#e8d4a8" stroke="#1a1a1a" stroke-width="22"/>
+    <polygon points="380,440 640,440 640,420 380,420" fill="#eedcb4" stroke="#1a1a1a" stroke-width="22"/>
+    <polygon points="640,440 840,490 820,470 640,420" fill="#e8d4a8" stroke="#1a1a1a" stroke-width="22"/>
+
+    <!-- folded inner flaps -->
+    <path d="M430,440 L380,380 L380,420 Z" fill="#e0c890" stroke="#1a1a1a" stroke-width="22"/>
+    <path d="M590,440 L640,380 L640,420 Z" fill="#e0c890" stroke="#1a1a1a" stroke-width="22"/>
+
+    <!-- tape seam -->
+    <line x1="430" y1="440" x2="430" y2="580" stroke="#1a1a1a" stroke-width="18"/>
+    <line x1="590" y1="440" x2="590" y2="580" stroke="#1a1a1a" stroke-width="18"/>
+    <line x1="430" y1="580" x2="590" y2="580" stroke="#1a1a1a" stroke-width="18"/>
+
+    <!-- water -->
+    <path d="M130,790 C185,750 240,830 295,790 C350,750 405,830 460,790 C515,750 570,830 625,790 C680,750 735,830 790,790 C830,760 870,760 900,790" stroke="#1a1a1a" stroke-width="22"/>
+  </g>
+
+  <!-- cabin / superstructure -->
+  <g>
+    <!-- smokestack -->
+    <rect x="510" y="205" width="90" height="130" rx="14" fill="#1a1a1a"/>
+    <rect x="494" y="190" width="122" height="34" rx="17" fill="#1a1a1a"/>
+
+    <!-- cabin shadow -->
+    <path d="M420,310 L700,285 Q718,283 718,302 V420 Q718,438 700,437 L420,412 Q404,411 404,394 V327 Q404,311 420,310 Z" fill="#1a1a1a"/>
+
+    <!-- cabin face -->
+    <path d="M380,318 L660,294 Q677,292 677,309 V420 Q677,438 660,436 L380,412 Q364,411 364,394 V335 Q364,320 380,318 Z" fill="#fff" stroke="#1a1a1a" stroke-width="20" stroke-linejoin="round"/>
+
+    <!-- windows -->
+    <rect x="400" y="345" width="68" height="54" rx="10" fill="#1a1a1a"/>
+    <rect x="498" y="336" width="68" height="58" rx="10" fill="#1a1a1a"/>
+
+    <!-- porthole -->
+    <circle cx="780" cy="610" r="28" fill="#1a1a1a"/>
+    <circle cx="780" cy="610" r="16" fill="#fff"/>
+  </g>
+</svg>
