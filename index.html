@@ -418,6 +418,150 @@
   }
   select.version-select:focus { border-color: var(--accent); }
 
+  /* ── source link ── */
+  .source-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    margin-bottom: 14px;
+    transition: color .15s;
+  }
+  .source-link:hover { color: var(--accent2); }
+  .source-link svg { flex-shrink: 0; }
+
+  /* ── github releases section ── */
+  #gh-section {
+    margin-top: 28px;
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+  }
+  #gh-section h2 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  #gh-form {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  #gh-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: var(--mono);
+    outline: none;
+    transition: border-color .15s;
+    max-width: 320px;
+  }
+  #gh-input:focus { border-color: var(--accent); }
+  #gh-input::placeholder { color: var(--muted); }
+  .gh-release {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .gh-release-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .gh-release-header:hover { background: rgba(201,124,26,.06); }
+  .gh-release-tag {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent2);
+    flex: 1;
+  }
+  .gh-release-date { font-size: 12px; color: var(--muted); }
+  .gh-release-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 10px 14px;
+  }
+  .gh-release.open .gh-release-body { display: block; }
+  .gh-release.open .chevron { transform: rotate(90deg); }
+  .gh-asset-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .gh-asset-row:last-child { border-bottom: none; }
+  .gh-asset-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gh-asset-size { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  /* ── about modal ── */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  .modal h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .modal p { font-size: 13px; line-height: 1.6; color: var(--muted); margin-bottom: 10px; }
+  .modal p:last-of-type { margin-bottom: 18px; }
+  .modal a { color: var(--accent2); text-decoration: none; }
+  .modal a:hover { text-decoration: underline; }
+  .modal-footer { display: flex; justify-content: flex-end; }
+
+  /* ── header nav buttons ── */
+  button.nav-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  button.nav-btn:hover { color: var(--text); border-color: var(--accent); opacity: 1; }
+
   @media (max-width: 600px) {
     header { flex-wrap: wrap; }
     #server-form { max-width: 100%; }
@@ -439,7 +583,21 @@
     <button onclick="connect()">Connect</button>
   </form>
   <button class="secondary" onclick="refresh()" title="Refresh">↻</button>
+  <button class="nav-btn" onclick="showAbout()">About</button>
+  <a href="https://github.com/pawi1/pkgtug" target="_blank" rel="noopener">
+    <button class="nav-btn">GitHub</button>
+  </a>
 </header>
+
+<div class="modal-backdrop" id="about-modal" onclick="if(event.target===this)closeAbout()">
+  <div class="modal">
+    <h2><img src="pkgtug.svg" style="width:22px;height:22px"> pkgtug</h2>
+    <p>Self-hosted binary package manager. Run a server, workers build your binaries, clients install and auto-update them.</p>
+    <p>Supports GitHub Releases as a source, direct push for pre-built binaries, zstd/xz compression, systemd service management, and meta-remotes for federated discovery.</p>
+    <p><a href="https://github.com/pawi1/pkgtug" target="_blank" rel="noopener">github.com/pawi1/pkgtug</a></p>
+    <div class="modal-footer"><button onclick="closeAbout()">Close</button></div>
+  </div>
+</div>
 
 <main>
   <div id="health-bar"></div>
@@ -449,6 +607,16 @@
     <input id="search-input" type="search" placeholder="filter packages…" oninput="filterPackages(this.value)" autocomplete="off">
   </div>
   <div id="pkg-list"></div>
+
+  <div id="gh-section">
+    <h2>GitHub Releases</h2>
+    <div id="gh-form">
+      <input id="gh-input" type="text" placeholder="owner/repo" autocomplete="off" spellcheck="false"
+             onkeydown="if(event.key==='Enter')searchGHReleases()">
+      <button onclick="searchGHReleases()">Search</button>
+    </div>
+    <div id="gh-results"></div>
+  </div>
 </main>
 
 <script>
@@ -640,6 +808,16 @@ async function toggleCard(card, name) {
 
     pickerRow.append(label, versionSelect);
     body.appendChild(pickerRow);
+  }
+
+  if (mf.source_url) {
+    const link = el('a', 'source-link');
+    link.href = mf.source_url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>'
+      + esc(mf.source_url.replace(/^https?:\/\//, ''));
+    body.appendChild(link);
   }
 
   body.appendChild(compContainer);
@@ -911,6 +1089,90 @@ function loadScript(src) {
     s.onerror = () => reject(new Error('Failed to load ' + src));
     document.head.appendChild(s);
   });
+}
+
+// ── about modal ───────────────────────────────────────────────────────────────
+
+function showAbout() { document.getElementById('about-modal').classList.add('open'); }
+function closeAbout() { document.getElementById('about-modal').classList.remove('open'); }
+
+// ── github releases search ────────────────────────────────────────────────────
+
+async function searchGHReleases() {
+  const raw = document.getElementById('gh-input').value.trim();
+  if (!raw) return;
+
+  // Accept "owner/repo" or full github.com URL
+  const match = raw.match(/(?:github\.com\/)?([^/\s]+\/[^/\s]+)/);
+  if (!match) {
+    document.getElementById('gh-results').innerHTML = '<span class="no-results">Enter owner/repo format.</span>';
+    return;
+  }
+  const repo = match[1].replace(/\.git$/, '');
+  const resultsEl = document.getElementById('gh-results');
+  resultsEl.innerHTML = '<span class="spinner"></span>';
+
+  let releases;
+  try {
+    const resp = await fetch('https://api.github.com/repos/' + repo + '/releases');
+    if (!resp.ok) throw new Error(resp.status === 404 ? 'Repository not found.' : 'GitHub API error: ' + resp.status);
+    releases = await resp.json();
+  } catch (e) {
+    resultsEl.innerHTML = '<span style="color:var(--red)">' + esc(e.message) + '</span>';
+    return;
+  }
+
+  if (!releases.length) {
+    resultsEl.innerHTML = '<span class="no-results">No releases found.</span>';
+    return;
+  }
+
+  resultsEl.innerHTML = '';
+  for (const release of releases) {
+    const card = el('div', 'gh-release');
+
+    const hdr = el('div', 'gh-release-header');
+    hdr.onclick = () => card.classList.toggle('open');
+
+    const tag = el('span', 'gh-release-tag');
+    tag.textContent = release.tag_name + (release.name && release.name !== release.tag_name ? ' — ' + release.name : '');
+
+    const date = el('span', 'gh-release-date');
+    date.textContent = release.published_at ? new Date(release.published_at).toLocaleDateString() : '';
+
+    const chev = el('span', 'chevron');
+    chev.textContent = '▶';
+
+    hdr.append(tag, date, chev);
+    card.appendChild(hdr);
+
+    const body = el('div', 'gh-release-body');
+    if (!release.assets || release.assets.length === 0) {
+      body.innerHTML = '<span style="color:var(--muted);font-size:12px">No assets.</span>';
+    } else {
+      for (const asset of release.assets) {
+        const row = el('div', 'gh-asset-row');
+        const name = el('span', 'gh-asset-name');
+        name.textContent = asset.name;
+        name.title = asset.name;
+        const size = el('span', 'gh-asset-size');
+        size.textContent = fmtBytes(asset.size);
+        const dlBtn = el('button', '');
+        dlBtn.textContent = 'Download';
+        dlBtn.onclick = () => window.open(asset.browser_download_url, '_blank');
+        row.append(name, size, dlBtn);
+        body.appendChild(row);
+      }
+    }
+    card.appendChild(body);
+    resultsEl.appendChild(card);
+  }
+}
+
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1024 / 1024).toFixed(1) + ' MB';
 }
 </script>
 
