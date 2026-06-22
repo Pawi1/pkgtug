@@ -57,6 +57,7 @@ packages:
     version_source:
       type: tag
       pattern: "v*"
+    # pre_build_command: "go generate ./..."  # optional: runs before build_command
     build_command: "go build -o myapp ./cmd/myapp"
     binaries:
       - component: myapp

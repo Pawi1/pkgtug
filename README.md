@@ -16,7 +16,7 @@ git push
     │           └─ new tag / new SHA detected → job queued
     │
     └─► pkgtug-worker --once     (CI runner or daemon)
-            └─ git clone → build → POST result to server
+            └─ git clone → pre-build? → build → POST result to server
                     └─ manifest.json updated atomically
                             └─ pkgtug update              (on production hosts)
                                     └─ download → verify SHA256 → swap binary
@@ -66,6 +66,7 @@ packages:
       pattern: "*-stable"
       # type: branch     # track a branch (version = short SHA)
       # name: main
+    # pre_build_command: "./scripts/gen.sh"  # optional: runs in clone dir before build_command
     build_command: "make build"
     poll_interval: "5m"   # optional: re-check for new versions on a schedule
     binaries:
@@ -345,15 +346,15 @@ In non-interactive mode (cron, daemon): automatically keeps the current file, sa
 
 1. Fetch `manifest.json` from the package's remote
 2. Compare installed version (string equality — works for both tags and SHAs)
-3. Download new file to temp location
-4. Verify SHA256
-5. **Conflict check** — compare on-disk SHA256 to baseline; prompt or auto-resolve
+3. Download new binary to a temp file beside the target path
+4. Verify SHA256 against `manifest.json` — abort on mismatch
+5. **Conflict check** — compare on-disk SHA256 to the post-install baseline; prompt or auto-resolve
 6. Backup current file to `backup_dir`
 7. Stop service (`systemctl` or `rc-service`, auto-detected at runtime)
-8. Atomic replace (`rename`)
-9. Run `post_install` command if set
+8. Atomic swap — `rename(tmp, target)` (never a partial write)
+9. Run `post_install` command if set (e.g. `systemctl daemon-reload`)
 10. Start service
-11. Health check
+11. Health check — URL or shell command, retried up to 5×
 12. On failure → restore backup, restart service
 
 ### Cron / systemd timer

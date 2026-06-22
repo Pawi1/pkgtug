@@ -22,6 +22,7 @@ packages:
     version_source:
       type: tag
       pattern: "*-stable"
+    # pre_build_command: "./scripts/gen.sh"   # optional: runs in clone dir before build_command
     build_command: "make build-binary"
     poll_interval: "5m"   # optional: check for new versions every 5 min (backup for missed webhooks)
     binaries:
@@ -38,6 +39,7 @@ packages:
     version_source:
       type: branch
       name: main
+    # pre_build_command: "go generate ./..."  # optional: e.g. generate code before building
     build_command: "go build -o dist/myservice ./cmd/myservice"
     binaries:
       - component: server
