@@ -622,29 +622,33 @@ async function downloadBinary(bin, componentName, btn) {
     const resp = await fetch(bin.url);
     if (!resp.ok) throw new Error(resp.status + ' ' + resp.statusText);
 
-    const total = +resp.headers.get('Content-Length') || 0;
-    const reader = resp.body.getReader();
-    const chunks = [];
-    let received = 0;
-    while (true) {
-      const {done, value} = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      if (total > 0) btn.textContent = Math.round(received / total * 100) + '%';
-    }
-
-    let data = new Uint8Array(received);
-    let pos = 0;
-    for (const chunk of chunks) { data.set(chunk, pos); pos += chunk.length; }
-
     const compressed = bin.compressed || '';
-    if (compressed === 'zstd') {
+    let data;
+
+    if (compressed === 'xz') {
+      // XzReadableStream takes a ReadableStream — pipe directly, no chunk buffering
       btn.textContent = 'Decompressing…';
-      data = await fzstdDecompress(data);
-    } else if (compressed === 'xz') {
-      btn.textContent = 'Decompressing…';
-      data = await xzDecompress(data);
+      data = await xzDecompress(resp.body);
+    } else {
+      const total = +resp.headers.get('Content-Length') || 0;
+      const reader = resp.body.getReader();
+      const chunks = [];
+      let received = 0;
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total > 0) btn.textContent = Math.round(received / total * 100) + '%';
+      }
+      data = new Uint8Array(received);
+      let pos = 0;
+      for (const chunk of chunks) { data.set(chunk, pos); pos += chunk.length; }
+
+      if (compressed === 'zstd') {
+        btn.textContent = 'Decompressing…';
+        data = await fzstdDecompress(data);
+      }
     }
 
     const a = Object.assign(document.createElement('a'), {
@@ -674,8 +678,10 @@ async function fzstdDecompress(data) {
   return window._fzstd.decompress(data);
 }
 
-async function xzDecompress(_data) {
-  throw new Error('XZ decompression is not supported in the browser — use pkgtug CLI instead');
+async function xzDecompress(responseBody) {
+  // xz-decompress exports XzReadableStream — ES module only, no UMD build
+  const { XzReadableStream } = await import('https://esm.sh/xz-decompress');
+  return new Uint8Array(await new Response(new XzReadableStream(responseBody)).arrayBuffer());
 }
 
 function loadScript(src) {
