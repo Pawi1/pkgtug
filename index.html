@@ -315,6 +315,18 @@
     white-space: nowrap;
   }
 
+  .comp-tag {
+    display: inline-block;
+    margin-left: 8px;
+    background: rgba(201,124,26,.12);
+    border: 1px solid rgba(201,124,26,.25);
+    border-radius: 3px;
+    padding: 0 5px;
+    font-size: 10px;
+    color: var(--accent2);
+    vertical-align: middle;
+  }
+
   .row-actions { display: flex; gap: 5px; flex-shrink: 0; }
 
   /* ── push section ── */
@@ -717,6 +729,13 @@ function renderComponents(container, name, mf, selectedVersion, components) {
       const sha = el('span', 'sha-text');
       sha.title = sha256;
       sha.textContent = sha256 ? 'sha256: ' + sha256.slice(0, 16) + '…' : 'sha256: —';
+
+      const compressed = isCurrentVersion ? (bin.compressed || '') : '';
+      if (compressed) {
+        const compTag = el('span', 'comp-tag');
+        compTag.textContent = compressed;
+        sha.appendChild(compTag);
+      }
 
       const actions = el('div', 'row-actions');
 
