@@ -674,13 +674,8 @@ async function fzstdDecompress(data) {
   return window._fzstd.decompress(data);
 }
 
-async function xzDecompress(data) {
-  if (!window._xzd) {
-    await loadScript('https://cdn.jsdelivr.net/npm/xz-decompress@0.2.2/dist/xz-decompress.js');
-    window._xzd = window.XZDecompress;
-    if (!window._xzd) throw new Error('xz-decompress library not available');
-  }
-  return window._xzd.decompress(data);
+async function xzDecompress(_data) {
+  throw new Error('XZ decompression is not supported in the browser — use pkgtug CLI instead');
 }
 
 function loadScript(src) {
