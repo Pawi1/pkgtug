@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -37,6 +38,22 @@ func (s *Server) handleBinaryDownload(w http.ResponseWriter, r *http.Request) {
 
 	if _, ok := s.packages[name]; !ok {
 		http.Error(w, "package not found", http.StatusNotFound)
+		return
+	}
+
+	if version == "latest" {
+		for _, seg := range []string{platform, component} {
+			if err := validPathComponent(seg); err != nil {
+				http.Error(w, "invalid path: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+		v := s.states[name].getVersion()
+		if v == "" {
+			http.Error(w, "no build available yet", http.StatusNotFound)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("/tug/repo/%s/binaries/%s/%s/%s", name, v, platform, component), http.StatusFound)
 		return
 	}
 
