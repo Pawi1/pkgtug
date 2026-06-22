@@ -377,6 +377,34 @@
 
   .no-results { color: var(--muted); font-size: 13px; padding: 8px 0; }
 
+  /* ── version picker ── */
+  .version-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .version-picker-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  select.version-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 4px 10px;
+    font-size: 13px;
+    font-family: var(--mono);
+    outline: none;
+    cursor: pointer;
+  }
+  select.version-select:focus { border-color: var(--accent); }
+
   @media (max-width: 600px) {
     header { flex-wrap: wrap; }
     #server-form { max-width: 100%; }
@@ -549,9 +577,12 @@ async function toggleCard(card, name) {
   const body = document.getElementById('body-' + name);
   if (body.dataset.loaded) return;
 
-  let mf;
+  let mf, versions;
   try {
-    mf = await apiFetch('/tug/repo/' + name + '/manifest.json');
+    [mf, versions] = await Promise.all([
+      apiFetch('/tug/repo/' + name + '/manifest.json'),
+      apiFetch('/tug/repo/' + name + '/versions').catch(() => []),
+    ]);
   } catch (e) {
     const is404 = e.message.includes('404');
     body.innerHTML = '<span style="color:' + (is404 ? 'var(--yellow)' : 'var(--red)') + '">'
@@ -569,44 +600,37 @@ async function toggleCard(card, name) {
     return;
   }
 
-  for (const comp of components) {
-    const section = el('div', 'component');
-    const compTitle = el('div', 'component-name');
-    compTitle.textContent = comp;
-    section.appendChild(compTitle);
+  // Version picker — only if there are historical versions to choose from
+  const compContainer = el('div', '');
+  if (versions && versions.length > 1) {
+    const pickerRow = el('div', 'version-picker-row');
+    const label = el('label', 'version-picker-label');
+    label.textContent = 'Version';
+    const versionSelect = el('select', 'version-select');
 
-    const platforms = Object.keys(mf.binaries[comp]).sort();
-    for (const plat of platforms) {
-      const bin = mf.binaries[comp][plat];
-      const row = el('div', 'platform-row');
+    const latestOpt = document.createElement('option');
+    latestOpt.value = 'latest';
+    latestOpt.textContent = 'latest (' + esc(mf.version || '?') + ')';
+    versionSelect.appendChild(latestOpt);
 
-      const tag = el('span', 'platform-tag');
-      tag.textContent = plat;
-
-      const sha = el('span', 'sha-text');
-      sha.title = bin.sha256;
-      sha.textContent = 'sha256: ' + bin.sha256.slice(0, 16) + '…';
-
-      const actions = el('div', 'row-actions');
-
-      const dlBtn = el('button', '');
-      dlBtn.textContent = 'Download';
-      dlBtn.onclick = () => downloadBinary(bin, comp, dlBtn);
-
-      const copyUrlBtn = el('button', 'copy-btn');
-      copyUrlBtn.textContent = 'Copy URL';
-      copyUrlBtn.onclick = () => copyText(bin.url, copyUrlBtn);
-
-      const copyShaBtn = el('button', 'copy-btn');
-      copyShaBtn.textContent = 'Copy SHA256';
-      copyShaBtn.onclick = () => copyText(bin.sha256, copyShaBtn);
-
-      actions.append(dlBtn, copyUrlBtn, copyShaBtn);
-      row.append(tag, sha, actions);
-      section.appendChild(row);
+    for (const v of versions) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v === mf.version ? v + ' (current)' : v;
+      versionSelect.appendChild(opt);
     }
-    body.appendChild(section);
+    versionSelect.value = 'latest';
+
+    versionSelect.onchange = () => {
+      renderComponents(compContainer, name, mf, versionSelect.value, components);
+    };
+
+    pickerRow.append(label, versionSelect);
+    body.appendChild(pickerRow);
   }
+
+  body.appendChild(compContainer);
+  renderComponents(compContainer, name, mf, 'latest', components);
 
   // Direct push — collapsed by default
   const pushSection = el('div', 'push-section');
@@ -660,6 +684,71 @@ async function toggleCard(card, name) {
   pushSection.append(pushToggle, pushContent);
   body.appendChild(pushSection);
   updateCurl();
+}
+
+function renderComponents(container, name, mf, selectedVersion, components) {
+  container.innerHTML = '';
+  const isCurrentVersion = selectedVersion === 'latest' || selectedVersion === mf.version;
+
+  for (const comp of components) {
+    const section = el('div', 'component');
+    const compTitle = el('div', 'component-name');
+    compTitle.textContent = comp;
+    section.appendChild(compTitle);
+
+    const platforms = Object.keys(mf.binaries[comp]).sort();
+    for (const plat of platforms) {
+      const bin = mf.binaries[comp][plat];
+      const row = el('div', 'platform-row');
+
+      const tag = el('span', 'platform-tag');
+      tag.textContent = plat;
+
+      let downloadURL, sha256;
+      if (isCurrentVersion) {
+        downloadURL = bin.url;
+        sha256 = bin.sha256 || '';
+      } else {
+        downloadURL = serverURL + '/tug/repo/' + name + '/binaries/' + selectedVersion + '/' + plat + '/' + comp;
+        sha256 = '';
+      }
+
+      const sha = el('span', 'sha-text');
+      sha.title = sha256;
+      sha.textContent = sha256 ? 'sha256: ' + sha256.slice(0, 16) + '…' : 'sha256: —';
+
+      const actions = el('div', 'row-actions');
+
+      const dlBtn = el('button', '');
+      dlBtn.textContent = 'Download';
+      if (isCurrentVersion) {
+        const binRef = bin;
+        dlBtn.onclick = () => downloadBinary(binRef, comp, dlBtn);
+      } else {
+        const url = downloadURL;
+        dlBtn.onclick = () => window.open(url, '_blank');
+      }
+
+      const copyUrlBtn = el('button', 'copy-btn');
+      copyUrlBtn.textContent = 'Copy URL';
+      const urlRef = downloadURL;
+      copyUrlBtn.onclick = () => copyText(urlRef, copyUrlBtn);
+
+      const copyShaBtn = el('button', 'copy-btn');
+      copyShaBtn.textContent = 'Copy SHA256';
+      if (sha256) {
+        const shaRef = sha256;
+        copyShaBtn.onclick = () => copyText(shaRef, copyShaBtn);
+      } else {
+        copyShaBtn.disabled = true;
+      }
+
+      actions.append(dlBtn, copyUrlBtn, copyShaBtn);
+      row.append(tag, sha, actions);
+      section.appendChild(row);
+    }
+    container.appendChild(section);
+  }
 }
 
 // ── search / filter ───────────────────────────────────────────────────────────
