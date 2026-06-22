@@ -14,6 +14,7 @@ type Config struct {
 	ServerURL string `yaml:"server_url,omitempty"`
 
 	Remotes  []Remote        `yaml:"remotes,omitempty"`
+	MetaURLs []string        `yaml:"meta_urls,omitempty"` // URLs of meta-manifests listing additional remotes
 	Telegram TelegramSection `yaml:"telegram,omitempty"`
 }
 

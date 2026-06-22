@@ -18,6 +18,8 @@ func (a *App) cmdRemote(args []string) error {
 		return a.remoteRemove(args[1:])
 	case "list", "ls":
 		return a.remoteList()
+	case "meta":
+		return a.remoteMeta(args[1:])
 	default:
 		return fmt.Errorf("unknown remote subcommand %q", args[0])
 	}
@@ -65,7 +67,7 @@ func (a *App) remoteRemove(args []string) error {
 }
 
 func (a *App) remoteList() error {
-	if len(a.cfg.Remotes) == 0 {
+	if len(a.cfg.Remotes) == 0 && len(a.cfg.MetaURLs) == 0 {
 		fmt.Println("no remotes configured")
 		fmt.Println("add one with: pkgtug remote add <name> <url>")
 		return nil
@@ -73,5 +75,65 @@ func (a *App) remoteList() error {
 	for _, r := range a.cfg.Remotes {
 		fmt.Printf("%-20s  %s\n", r.Name, r.URL)
 	}
+	for _, u := range a.cfg.MetaURLs {
+		fmt.Printf("%-20s  %s\n", "(meta)", u)
+	}
 	return nil
+}
+
+func (a *App) remoteMeta(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: pkgtug remote meta <add|list|remove> [args]")
+	}
+	switch args[0] {
+	case "add":
+		if len(args) != 2 {
+			return fmt.Errorf("usage: pkgtug remote meta add <url>")
+		}
+		url := strings.TrimRight(args[1], "/")
+		for _, u := range a.cfg.MetaURLs {
+			if u == url {
+				return fmt.Errorf("meta URL already configured: %s", url)
+			}
+		}
+		a.cfg.MetaURLs = append(a.cfg.MetaURLs, url)
+		if err := a.saveConfig(); err != nil {
+			return err
+		}
+		fmt.Printf("meta URL added: %s\n", url)
+		return nil
+	case "remove", "rm":
+		if len(args) != 2 {
+			return fmt.Errorf("usage: pkgtug remote meta remove <url>")
+		}
+		url := strings.TrimRight(args[1], "/")
+		before := len(a.cfg.MetaURLs)
+		filtered := a.cfg.MetaURLs[:0]
+		for _, u := range a.cfg.MetaURLs {
+			if u != url {
+				filtered = append(filtered, u)
+			}
+		}
+		if len(filtered) == before {
+			return fmt.Errorf("meta URL not found: %s", url)
+		}
+		a.cfg.MetaURLs = filtered
+		if err := a.saveConfig(); err != nil {
+			return err
+		}
+		fmt.Printf("meta URL removed: %s\n", url)
+		return nil
+	case "list", "ls":
+		if len(a.cfg.MetaURLs) == 0 {
+			fmt.Println("no meta URLs configured")
+			fmt.Println("add one with: pkgtug remote meta add <url>")
+			return nil
+		}
+		for _, u := range a.cfg.MetaURLs {
+			fmt.Println(u)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown meta subcommand %q", args[0])
+	}
 }

@@ -313,16 +313,17 @@ func (a *App) resolveRemote(remoteName, pkgName string) (string, string, error) 
 		url, err := a.cfg.RemoteURL(remoteName)
 		return url, remoteName, err
 	}
-	if len(a.cfg.Remotes) == 0 {
+	remotes := client.EffectiveRemotes(a.cfg)
+	if len(remotes) == 0 {
 		return "", "", fmt.Errorf("no remotes configured — run: pkgtug remote add <name> <url>")
 	}
-	if len(a.cfg.Remotes) == 1 {
-		r := a.cfg.Remotes[0]
+	if len(remotes) == 1 {
+		r := remotes[0]
 		return r.URL, r.Name, nil
 	}
-	// Probe each configured remote until the package is found.
+	// Probe each remote (local + meta) until the package is found.
 	p := a.newProgress()
-	for _, r := range a.cfg.Remotes {
+	for _, r := range remotes {
 		p.StartSpinner("checking " + r.Name)
 		list, err := client.FetchPackages(r.URL)
 		p.StopSpinner()

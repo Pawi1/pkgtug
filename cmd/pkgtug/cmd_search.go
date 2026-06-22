@@ -15,11 +15,11 @@ func (a *App) cmdSearch(args []string) error {
 
 	query := strings.Join(fs.Args(), " ")
 
-	if len(a.cfg.Remotes) == 0 {
+	remotes := client.EffectiveRemotes(a.cfg)
+	if len(remotes) == 0 {
 		return fmt.Errorf("no remotes configured — run: pkgtug remote add <name> <url>")
 	}
 
-	remotes := a.cfg.Remotes
 	if *remoteName != "" {
 		url, err := a.cfg.RemoteURL(*remoteName)
 		if err != nil {
