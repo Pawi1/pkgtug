@@ -223,7 +223,12 @@ func postSuccess(ctx context.Context, client *http.Client, cfg Config, j *job, c
 			return err
 		}
 		f.Close()
-		log.Printf("worker [%s]: %s sha256=%s compress=%s", j.ID, bin.Component, hex.EncodeToString(h.Sum(nil)), algo)
+		origSHA := hex.EncodeToString(h.Sum(nil))
+		log.Printf("worker [%s]: %s sha256=%s compress=%s", j.ID, bin.Component, origSHA, algo)
+		// Send SHA of the original (pre-compression) file so the server can
+		// store it in the manifest. The client decompresses before verifying,
+		// so the manifest must contain the uncompressed SHA.
+		mw.WriteField(bin.Component+"_sha256", origSHA)
 	}
 	mw.Close()
 

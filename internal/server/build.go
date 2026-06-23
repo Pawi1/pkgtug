@@ -121,7 +121,8 @@ func (s *Server) storeBuildResult(job *Job, r *http.Request) error {
 		if err != nil {
 			return fmt.Errorf("component %q missing from upload: %w", bin.Component, err)
 		}
-		if err := s.storeBinary(job.PackageName, job.Version, job.Platform, bin.Component, compressed, fh); err != nil {
+		origSHA := r.FormValue(bin.Component + "_sha256")
+		if err := s.storeBinary(job.PackageName, job.Version, job.Platform, bin.Component, compressed, origSHA, fh); err != nil {
 			fh.Close()
 			return err
 		}
@@ -131,7 +132,9 @@ func (s *Server) storeBuildResult(job *Job, r *http.Request) error {
 }
 
 // storeBinary saves one binary file and updates the package manifest atomically.
-func (s *Server) storeBinary(pkgName, version, platform, component, compressed string, src io.Reader) error {
+// origSHA is the SHA256 of the uncompressed binary (sent by the worker); if empty
+// (direct push, no compression), the SHA is computed from the stored file instead.
+func (s *Server) storeBinary(pkgName, version, platform, component, compressed, origSHA string, src io.Reader) error {
 	for _, seg := range []string{pkgName, version, platform, component} {
 		if err := validPathComponent(seg); err != nil {
 			return fmt.Errorf("invalid upload field: %w", err)
@@ -159,9 +162,17 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 		return err
 	}
 
-	sum, size, err := saveFile(src, destPath)
+	storedSum, size, err := saveFile(src, destPath)
 	if err != nil {
 		return fmt.Errorf("save %s: %w", component, err)
+	}
+	// Use the pre-compression SHA when available (worker builds with compression).
+	// The client decompresses before verifying, so the manifest must hold the
+	// uncompressed SHA. For direct pushes the file arrives as-is, so fall back
+	// to the stored-file SHA.
+	manifestSHA := origSHA
+	if manifestSHA == "" {
+		manifestSHA = storedSum
 	}
 
 	mfPath := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName, "manifest.json")
@@ -184,7 +195,7 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 	}
 	url := fmt.Sprintf("%s/tug/repo/%s/binaries/%s/%s/%s",
 		s.cfg.Server.BaseURL, pkgName, version, platform, component)
-	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: sum, Size: size, Compressed: compressed}
+	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: manifestSHA, Size: size, Compressed: compressed}
 
 	if err := manifest.WriteAtomic(mfPath, mf); err != nil {
 		return err
