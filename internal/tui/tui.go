@@ -19,12 +19,22 @@ func IsTerminal() bool {
 // UI provides spinner + progress bar output for interactive terminals.
 // It satisfies client.Progress.
 type UI struct {
-	sp *spinner.Spinner
+	sp  *spinner.Spinner
+	bar *progressbar.ProgressBar // non-nil while a download is in progress
 }
 
 func New() *UI {
 	sp := spinner.New(spinner.CharSets[14], 80*time.Millisecond, spinner.WithWriter(os.Stderr))
 	return &UI{sp: sp}
+}
+
+// stopBar stops and clears the active progress bar, if any.
+func (u *UI) stopBar() {
+	if u.bar != nil {
+		u.bar.Exit()
+		u.bar = nil
+		fmt.Fprint(os.Stderr, "\r\033[K") // clear the bar line
+	}
 }
 
 func (u *UI) Log(format string, args ...any) {
@@ -63,9 +73,11 @@ func (u *UI) DownloadWriter(name string, size int64) io.Writer {
 			BarEnd:        "]",
 		}),
 	)
+	u.bar = bar
 	return bar
 }
 
 func (u *UI) FinishDownload() {
+	u.stopBar()
 	fmt.Fprintln(os.Stderr)
 }

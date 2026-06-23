@@ -11,6 +11,7 @@ import (
 
 func (u *UI) ResolveConflict(key, path, diffText string) client.ConflictAction {
 	u.StopSpinner()
+	u.stopBar()
 
 	fmt.Fprintf(os.Stderr, "\n⚠  conflict: %s\n", key)
 	fmt.Fprintf(os.Stderr, "   %s was modified locally and a new version is available.\n\n", path)
@@ -26,7 +27,7 @@ func (u *UI) ResolveConflict(key, path, diffText string) client.ConflictAction {
 
 	r := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Fprint(os.Stderr, "  choice [k]: ")
+		fmt.Fprint(os.Stderr, "\n  choice [k]: ")
 		line, _ := r.ReadString('\n')
 		switch strings.TrimSpace(strings.ToLower(line)) {
 		case "u":
