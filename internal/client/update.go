@@ -247,6 +247,9 @@ func downloadToTempCompressed(url, token, name string, algo compress.Algo, p Pro
 func VerifySHA256File(path, expected string) error { return verifySHA256(path, expected) }
 
 func verifySHA256(path, expected string) error {
+	if expected == "" {
+		return nil
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return err
