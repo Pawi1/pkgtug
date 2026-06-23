@@ -292,7 +292,36 @@ func atomicReplace(src, dst string) error {
 	if err := os.Chmod(src, 0o755); err != nil {
 		return err
 	}
-	return os.Rename(src, dst)
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	}
+	// Cross-device: copy to a temp alongside the destination, then rename.
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".pkgtug-replace-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { tmp.Close(); os.Remove(tmpName) }()
+	if err := os.Chmod(tmpName, 0o755); err != nil {
+		return err
+	}
+	srcF, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	_, cpErr := io.Copy(tmp, srcF)
+	srcF.Close()
+	if cpErr != nil {
+		return cpErr
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, dst); err != nil {
+		return err
+	}
+	os.Remove(src)
+	return nil
 }
 
 func healthCheck(check string) error {
