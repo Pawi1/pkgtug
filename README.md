@@ -6,6 +6,10 @@ A self-hosted, generic package manager and auto-updater for binary releases.
 
 pkgtug tracks any git repository, builds its binaries when a new version appears, and distributes them to production hosts — without depending on GitHub/GitLab APIs, package registries, or any specific CI platform.
 
+```sh
+curl -fsSL https://pawi1.github.io/pkgtug/install.sh | sh
+```
+
 ## How it works
 
 ```
@@ -192,6 +196,16 @@ Copy `contrib/github-actions-worker.yml` to `.github/workflows/pkgtug-build.yml`
 Add a variable `PKGTUG_PLATFORM` (e.g. `linux-x64`) in GitHub Settings → Variables.
 
 ## Client (`pkgtug`)
+
+### Install
+
+```sh
+curl -fsSL https://pawi1.github.io/pkgtug/install.sh | sh
+# or
+wget -qO- https://pawi1.github.io/pkgtug/install.sh | sh
+```
+
+The script detects your OS and architecture, downloads a bootstrap binary, adds the public remote, and installs pkgtug via `pkgtug install` so it is tracked and auto-updatable. Requires `sudo`, `doas`, or `run0` (or run as root).
 
 ### Remotes
 
