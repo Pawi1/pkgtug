@@ -61,10 +61,15 @@ func EnsureClone(gitURL, localDir string) error {
 
 // Checkout checks out the given ref (tag, branch, or SHA) with a clean working tree.
 func Checkout(localDir, ref string) error {
-	if err := run(localDir, "checkout", "--detach", ref); err != nil {
+	// Reset and clean before switching ref so leftover build artifacts (e.g. dist/)
+	// don't block the checkout.
+	if err := run(localDir, "reset", "--hard"); err != nil {
 		return err
 	}
-	return run(localDir, "clean", "-fdx")
+	if err := run(localDir, "clean", "-fdx"); err != nil {
+		return err
+	}
+	return run(localDir, "checkout", "--detach", ref)
 }
 
 func run(dir string, args ...string) error {
