@@ -141,7 +141,11 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed s
 	// Resolve the destination to an absolute path and verify it stays within the
 	// packages directory. filepath.Abs output (not the raw Join) reaches the sink,
 	// which is the pattern path-injection analysers model as safe.
-	safeRoot := filepath.Clean(filepath.Join(s.cfg.Server.DataDir, "packages")) + string(filepath.Separator)
+	absPackagesDir, err := filepath.Abs(filepath.Join(s.cfg.Server.DataDir, "packages"))
+	if err != nil {
+		return fmt.Errorf("resolve packages dir: %w", err)
+	}
+	safeRoot := absPackagesDir + string(filepath.Separator)
 	destPath, err := filepath.Abs(filepath.Join(s.cfg.Server.DataDir, "packages", pkgName, version, platform, component))
 	if err != nil {
 		return fmt.Errorf("resolve dest path: %w", err)

@@ -79,7 +79,12 @@ func (s *Server) handleBinaryDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	safeRoot := filepath.Clean(filepath.Join(s.cfg.Server.DataDir, "packages")) + string(filepath.Separator)
+	absPackagesDir, err := filepath.Abs(filepath.Join(s.cfg.Server.DataDir, "packages"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	safeRoot := absPackagesDir + string(filepath.Separator)
 	binPath, err := filepath.Abs(filepath.Join(s.cfg.Server.DataDir, "packages", name, version, platform, component))
 	if err != nil || !strings.HasPrefix(binPath, safeRoot) {
 		http.Error(w, "bad path", http.StatusBadRequest)
