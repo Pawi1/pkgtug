@@ -92,7 +92,7 @@ func (a *App) cmdInstall(args []string) error {
 
 	fmt.Printf("\nInstalling %s from %s (version %s)\n\n", key, remoteName, mf.Version)
 
-	defaultPath := filepath.Join("/opt", pkgName, component)
+	defaultPath := filepath.Join(pathBinDir(), component)
 	binaryPath := prompt("Binary path", defaultPath)
 	postInstall := promptPostInstall(binaryPath)
 	serviceName := promptServiceName()
@@ -205,6 +205,38 @@ func (a *App) cmdInstall(args []string) error {
 		fmt.Printf("  backup:   %s\n", backupDir)
 	}
 	return nil
+}
+
+// pathBinDir returns the first directory from $PATH that exists and is writable,
+// preferring common system-wide bin dirs. Falls back to /usr/local/bin.
+func pathBinDir() string {
+	prefer := []string{"/usr/local/bin", "/usr/bin"}
+	dirs := filepath.SplitList(os.Getenv("PATH"))
+	// check preferred dirs first, then the rest of PATH
+	ordered := append(prefer, dirs...)
+	seen := make(map[string]bool)
+	for _, d := range ordered {
+		if d == "" || seen[d] {
+			continue
+		}
+		seen[d] = true
+		if f, err := os.Stat(d); err == nil && f.IsDir() {
+			if ok, _ := isDirWritable(d); ok {
+				return d
+			}
+		}
+	}
+	return "/usr/local/bin"
+}
+
+func isDirWritable(dir string) (bool, error) {
+	tmp, err := os.CreateTemp(dir, ".pkgtug-probe-*")
+	if err != nil {
+		return false, err
+	}
+	tmp.Close()
+	os.Remove(tmp.Name())
+	return true, nil
 }
 
 // promptPostInstall suggests a post-install command based on the install path and
