@@ -1,6 +1,6 @@
 <img src="https://pawi1.github.io/pkgtug/pkgtug.svg?v=2" alt="pkgtug" width="96">
 
-# pkgtug
+# pkgtug [![Test](https://github.com/pawi1/pkgtug/actions/workflows/test.yml/badge.svg)](https://github.com/pawi1/pkgtug/actions/workflows/test.yml)
 
 A self-hosted, generic package manager and auto-updater for binary releases.
 
