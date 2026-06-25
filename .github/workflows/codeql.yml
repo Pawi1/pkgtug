@@ -6,26 +6,35 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 4 * * 1'
+    - cron: '30 5 * * 6'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   analyze:
-    name: Analyze (go)
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       security-events: write
+      packages: read
+      actions: read
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: autobuild
+          - language: actions
+            build-mode: none
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: github/codeql-action/init@v4
         with:
-          go-version-file: go.mod
-      - uses: github/codeql-action/init@v3
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+      - uses: github/codeql-action/analyze@v4
         with:
-          languages: go
-      - uses: github/codeql-action/autobuild@v3
-      - uses: github/codeql-action/analyze@v3
+          category: "/language:${{ matrix.language }}"
