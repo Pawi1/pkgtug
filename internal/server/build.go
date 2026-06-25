@@ -200,6 +200,7 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed, 
 		for _, b := range pkg.Binaries {
 			if b.Component == component {
 				entry.InstallDeps = b.InstallDeps
+				entry.Detect = b.Detect
 				break
 			}
 		}

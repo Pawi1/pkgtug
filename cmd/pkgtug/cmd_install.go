@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -214,14 +215,19 @@ func (a *App) installOneComponent(pkgName, component, remoteName, serverURL stri
 }
 
 // topoSortComponents returns components in dependency order (deps before dependents).
-// Components with no install_deps come first; cycles are ignored (affected component
-// is placed at the end).
+// Components whose detect command fails are excluded. Cycles are silently broken.
 func topoSortComponents(mf *client.Manifest) ([]string, error) {
-	deps := make(map[string][]string, len(mf.Binaries))
+	// Build per-component metadata and filter by detect.
+	type meta struct {
+		deps []string
+	}
+	metas := make(map[string]meta, len(mf.Binaries))
 	for comp, platforms := range mf.Binaries {
-		// use deps from any platform entry (they're the same)
 		for _, bin := range platforms {
-			deps[comp] = bin.InstallDeps
+			if bin.Detect != "" && !detectPasses(bin.Detect) {
+				break // skip this component
+			}
+			metas[comp] = meta{deps: bin.InstallDeps}
 			break
 		}
 	}
@@ -234,17 +240,23 @@ func topoSortComponents(mf *client.Manifest) ([]string, error) {
 			return
 		}
 		visited[c] = true
-		for _, dep := range deps[c] {
-			if _, ok := mf.Binaries[dep]; ok {
-				visit(dep)
-			}
+		m, ok := metas[c]
+		if !ok {
+			return // filtered out by detect
+		}
+		for _, dep := range m.deps {
+			visit(dep)
 		}
 		order = append(order, c)
 	}
-	for c := range mf.Binaries {
+	for c := range metas {
 		visit(c)
 	}
 	return order, nil
+}
+
+func detectPasses(cmd string) bool {
+	return exec.Command("sh", "-c", cmd+" >/dev/null 2>&1").Run() == nil
 }
 
 // pathBinDir returns the first directory from $PATH that exists and is writable,

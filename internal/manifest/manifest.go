@@ -17,9 +17,10 @@ type Manifest struct {
 type Binary struct {
 	URL         string   `json:"url"`
 	SHA256      string   `json:"sha256"`
-	Size        int64    `json:"size"`                  // file size in bytes
-	Compressed  string   `json:"compressed,omitempty"`  // "zstd" | "xz" | ""
+	Size        int64    `json:"size"`                   // file size in bytes
+	Compressed  string   `json:"compressed,omitempty"`   // "zstd" | "xz" | ""
 	InstallDeps []string `json:"install_deps,omitempty"` // components to install before this one
+	Detect      string   `json:"detect,omitempty"`       // shell command; skip component if it exits non-zero
 }
 
 func Load(path string) (*Manifest, error) {

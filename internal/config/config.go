@@ -64,6 +64,7 @@ type Binary struct {
 	Component   string   `yaml:"component"`
 	Path        string   `yaml:"path"`
 	InstallDeps []string `yaml:"install_deps,omitempty"` // other components of this package to install first
+	Detect      string   `yaml:"detect,omitempty"`       // shell command; component is skipped if it fails (e.g. "which systemctl")
 }
 
 func LoadServer(path string) (*ServerConfig, error) {
