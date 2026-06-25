@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/pawi1/pkgtug/internal/manifest"
 )
@@ -28,41 +29,98 @@ func ensureSystemDeps(component string, deps []manifest.SystemDep) error {
 		}
 		fmt.Printf("\n  missing dependency for %s: %s\n", component, label)
 
-		if pm == nil {
-			fmt.Printf("  no supported package manager found; install %s manually\n", label)
-			if !confirmContinue("  continue without it?") {
-				return fmt.Errorf("dependency %q not satisfied", label)
+		var pkgToInstall string
+		if pm != nil {
+			fmt.Printf("  searching %s for package that provides %q...\n", pm.name, dep.File)
+			pkg, _ := pm.findProvider(dep.File)
+			if pkg != "" {
+				fmt.Printf("  provided by: %s\n", pkg)
+				pkgToInstall = pkg
+			} else {
+				fmt.Printf("  could not determine which package provides %q\n", dep.File)
 			}
-			continue
+		} else {
+			fmt.Println("  no supported package manager found")
 		}
 
-		fmt.Printf("  searching %s for package that provides %q...\n", pm.name, dep.File)
-		pkg, err := pm.findProvider(dep.File)
-		if err != nil || pkg == "" {
-			fmt.Printf("  could not find a package for %q\n", dep.File)
-			if !confirmContinue("  continue without it?") {
-				return fmt.Errorf("dependency %q not satisfied", label)
+		action := promptDepAction(pkgToInstall, pm)
+		switch action {
+		case depActionInstall:
+			if err := runPrivileged(pm.installCmd(pkgToInstall)); err != nil {
+				return fmt.Errorf("failed to install %q: %w", pkgToInstall, err)
 			}
-			continue
-		}
-
-		fmt.Printf("  provided by: %s\n", pkg)
-		if !confirmInstall(fmt.Sprintf("  install %s via %s?", pkg, pm.name)) {
-			if !confirmContinue("  continue without it?") {
-				return fmt.Errorf("dependency %q not satisfied", label)
+			if !depSatisfied(dep.File) {
+				return fmt.Errorf("%q still missing after installing %s — rolling back", dep.File, pkgToInstall)
 			}
-			continue
-		}
+			fmt.Printf("  ✓ %s installed\n", pkgToInstall)
 
-		if err := runPrivileged(pm.installCmd(pkg)); err != nil {
-			return fmt.Errorf("failed to install %q: %w", pkg, err)
+		case depActionShell:
+			fmt.Printf("  opening shell — install %q, then exit to continue\n", label)
+			if err := spawnShell(); err != nil {
+				fmt.Printf("  shell error: %v\n", err)
+			}
+			if !depSatisfied(dep.File) {
+				return fmt.Errorf("dependency %q still missing after shell — rolling back", label)
+			}
+			fmt.Printf("  ✓ %s now available\n", label)
+
+		case depActionBg:
+			fmt.Printf("  pkgtug suspended — install %q, then run: fg\n", label)
+			suspendSelf()
+			// execution resumes here after fg
+			if !depSatisfied(dep.File) {
+				return fmt.Errorf("dependency %q still missing after resume — rolling back", label)
+			}
+			fmt.Printf("  ✓ %s now available\n", label)
+
+		case depActionAbort:
+			return fmt.Errorf("dependency %q not satisfied — rolling back", label)
 		}
-		if !depSatisfied(dep.File) {
-			return fmt.Errorf("%q still not available after installing %s", dep.File, pkg)
-		}
-		fmt.Printf("  ✓ %s installed\n", pkg)
 	}
 	return nil
+}
+
+type depAction int
+
+const (
+	depActionInstall depAction = iota
+	depActionShell
+	depActionBg
+	depActionAbort
+)
+
+func promptDepAction(pkg string, pm *pkgManager) depAction {
+	fmt.Println()
+	if pkg != "" && pm != nil {
+		fmt.Printf("  (i) install %s via %s\n", pkg, pm.name)
+	}
+	fmt.Println("  (s) shell   — open subshell to install manually, then exit")
+	fmt.Println("  (b) bg      — suspend pkgtug (resume with fg)")
+	fmt.Println("  (a) abort   — roll back all changes")
+
+	for {
+		if pkg != "" && pm != nil {
+			fmt.Print("  choice [i]: ")
+		} else {
+			fmt.Print("  choice [s]: ")
+		}
+		line, _ := stdinReader.ReadString('\n')
+		switch strings.TrimSpace(strings.ToLower(line)) {
+		case "i", "":
+			if pkg != "" && pm != nil {
+				return depActionInstall
+			}
+			return depActionShell
+		case "s":
+			return depActionShell
+		case "b":
+			return depActionBg
+		case "a":
+			return depActionAbort
+		default:
+			fmt.Println("  enter i, s, b or a")
+		}
+	}
 }
 
 // depSatisfied returns true if file is an absolute path that exists, or a
@@ -323,4 +381,18 @@ func confirmContinue(prompt string) bool {
 	line, _ := stdinReader.ReadString('\n')
 	ans := strings.ToLower(strings.TrimSpace(line))
 	return ans == "y"
+}
+
+func spawnShell() error {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+	c := exec.Command(shell)
+	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return c.Run()
+}
+
+func suspendSelf() {
+	syscall.Kill(os.Getpid(), syscall.SIGSTOP)
 }

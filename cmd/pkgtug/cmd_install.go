@@ -71,11 +71,14 @@ func (a *App) cmdInstall(args []string) error {
 		if len(ordered) == 1 {
 			component = ordered[0]
 		} else {
-			// Install all components in dependency order.
+			// Install all components in dependency order; rollback on failure.
+			var installed []string // state keys installed so far
 			for _, c := range ordered {
 				if err := a.installOneComponent(pkgName, c, remoteName, serverURL, mf, *autoUpdate); err != nil {
+					a.rollbackInstalled(installed)
 					return err
 				}
+				installed = append(installed, pkgName+"/"+c)
 			}
 			return nil
 		}
@@ -258,6 +261,30 @@ func topoSortComponents(mf *client.Manifest) ([]string, error) {
 	return order, nil
 }
 
+
+// rollbackInstalled removes files and state entries for components installed
+// during a multi-component install that failed partway through.
+func (a *App) rollbackInstalled(keys []string) {
+	if len(keys) == 0 {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "\nrolling back %d installed component(s)...\n", len(keys))
+	for _, key := range keys {
+		entry, ok := a.state[key]
+		if !ok {
+			continue
+		}
+		if entry.BinaryPath != "" {
+			if err := os.Remove(entry.BinaryPath); err == nil {
+				fmt.Fprintf(os.Stderr, "  removed %s\n", entry.BinaryPath)
+			}
+		}
+		delete(a.state, key)
+	}
+	if err := a.saveState(); err != nil {
+		fmt.Fprintf(os.Stderr, "  warning: could not save state after rollback: %v\n", err)
+	}
+}
 
 // pathBinDir returns the first directory from $PATH that exists and is writable,
 // preferring common system-wide bin dirs. Falls back to /usr/local/bin.
