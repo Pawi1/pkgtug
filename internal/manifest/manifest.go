@@ -25,9 +25,8 @@ type Binary struct {
 }
 
 type SystemDep struct {
-	Name    string `json:"name"`
-	Detect  string `json:"detect"`
-	Install string `json:"install"`
+	File string `json:"file"`
+	Name string `json:"name,omitempty"`
 }
 
 func Load(path string) (*Manifest, error) {

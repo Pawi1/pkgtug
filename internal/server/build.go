@@ -203,9 +203,8 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed, 
 				entry.Detect = b.Detect
 				for _, sd := range b.SystemDeps {
 					entry.SystemDeps = append(entry.SystemDeps, manifest.SystemDep{
-						Name:    sd.Name,
-						Detect:  sd.Detect,
-						Install: sd.Install,
+						File: sd.File,
+						Name: sd.Name,
 					})
 				}
 				break

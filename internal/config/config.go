@@ -69,9 +69,8 @@ type Binary struct {
 }
 
 type SystemDep struct {
-	Name    string `yaml:"name"`    // human-readable name shown to the user
-	Detect  string `yaml:"detect"`  // command to check if dep is present; non-zero exit = missing
-	Install string `yaml:"install"` // command run (with privilege escalation) to install the dep
+	File string `yaml:"file"` // binary name (e.g. "openssl") or absolute path (e.g. "/usr/lib/libssl.so.3")
+	Name string `yaml:"name,omitempty"` // optional human-readable label; defaults to File
 }
 
 func LoadServer(path string) (*ServerConfig, error) {
