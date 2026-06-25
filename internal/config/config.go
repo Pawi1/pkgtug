@@ -61,10 +61,17 @@ type VersionSource struct {
 }
 
 type Binary struct {
-	Component   string   `yaml:"component"`
-	Path        string   `yaml:"path"`
-	InstallDeps []string `yaml:"install_deps,omitempty"` // other components of this package to install first
-	Detect      string   `yaml:"detect,omitempty"`       // shell command; component is skipped if it fails (e.g. "which systemctl")
+	Component   string      `yaml:"component"`
+	Path        string      `yaml:"path"`
+	InstallDeps []string    `yaml:"install_deps,omitempty"` // other components of this package to install first
+	Detect      string      `yaml:"detect,omitempty"`       // shell command; component is skipped if it fails (e.g. "which systemctl")
+	SystemDeps  []SystemDep `yaml:"system_deps,omitempty"`  // system packages required before this component can run
+}
+
+type SystemDep struct {
+	Name    string `yaml:"name"`    // human-readable name shown to the user
+	Detect  string `yaml:"detect"`  // command to check if dep is present; non-zero exit = missing
+	Install string `yaml:"install"` // command run (with privilege escalation) to install the dep
 }
 
 func LoadServer(path string) (*ServerConfig, error) {

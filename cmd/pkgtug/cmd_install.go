@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -106,6 +105,10 @@ func (a *App) installOneComponent(pkgName, component, remoteName, serverURL stri
 	healthCheck := promptOptional("Health check URL or command")
 	backupDir := promptOptional("Backup directory (for rollback)")
 	deps := promptDependencies(a)
+
+	if err := ensureSystemDeps(component, bin.SystemDeps); err != nil {
+		return err
+	}
 
 	algo, err := compress.Parse(bin.Compressed)
 	if err != nil {
@@ -224,7 +227,7 @@ func topoSortComponents(mf *client.Manifest) ([]string, error) {
 	metas := make(map[string]meta, len(mf.Binaries))
 	for comp, platforms := range mf.Binaries {
 		for _, bin := range platforms {
-			if bin.Detect != "" && !detectPasses(bin.Detect) {
+			if bin.Detect != "" && !runDetect(bin.Detect) {
 				break // skip this component
 			}
 			metas[comp] = meta{deps: bin.InstallDeps}
@@ -255,9 +258,6 @@ func topoSortComponents(mf *client.Manifest) ([]string, error) {
 	return order, nil
 }
 
-func detectPasses(cmd string) bool {
-	return exec.Command("sh", "-c", cmd+" >/dev/null 2>&1").Run() == nil
-}
 
 // pathBinDir returns the first directory from $PATH that exists and is writable,
 // preferring common system-wide bin dirs. Falls back to /usr/local/bin.

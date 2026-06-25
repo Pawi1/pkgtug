@@ -201,6 +201,13 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed, 
 			if b.Component == component {
 				entry.InstallDeps = b.InstallDeps
 				entry.Detect = b.Detect
+				for _, sd := range b.SystemDeps {
+					entry.SystemDeps = append(entry.SystemDeps, manifest.SystemDep{
+						Name:    sd.Name,
+						Detect:  sd.Detect,
+						Install: sd.Install,
+					})
+				}
 				break
 			}
 		}

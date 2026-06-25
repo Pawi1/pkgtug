@@ -15,12 +15,19 @@ type Manifest struct {
 }
 
 type Binary struct {
-	URL         string   `json:"url"`
-	SHA256      string   `json:"sha256"`
-	Size        int64    `json:"size"`                   // file size in bytes
-	Compressed  string   `json:"compressed,omitempty"`   // "zstd" | "xz" | ""
-	InstallDeps []string `json:"install_deps,omitempty"` // components to install before this one
-	Detect      string   `json:"detect,omitempty"`       // shell command; skip component if it exits non-zero
+	URL         string      `json:"url"`
+	SHA256      string      `json:"sha256"`
+	Size        int64       `json:"size"`                   // file size in bytes
+	Compressed  string      `json:"compressed,omitempty"`   // "zstd" | "xz" | ""
+	InstallDeps []string    `json:"install_deps,omitempty"` // components to install before this one
+	Detect      string      `json:"detect,omitempty"`       // shell command; skip component if it exits non-zero
+	SystemDeps  []SystemDep `json:"system_deps,omitempty"`  // system packages required before this component
+}
+
+type SystemDep struct {
+	Name    string `json:"name"`
+	Detect  string `json:"detect"`
+	Install string `json:"install"`
 }
 
 func Load(path string) (*Manifest, error) {
