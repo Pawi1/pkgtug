@@ -1,6 +1,6 @@
 <img src="https://pawi1.github.io/pkgtug/pkgtug.svg?v=2" alt="pkgtug" width="96">
 
-# pkgtug [![Test](https://github.com/pawi1/pkgtug/actions/workflows/test.yml/badge.svg)](https://github.com/pawi1/pkgtug/actions/workflows/test.yml) [![CodeQL](https://github.com/pawi1/pkgtug/actions/workflows/codeql.yml/badge.svg)](https://github.com/pawi1/pkgtug/actions/workflows/codeql.yml)
+# pkgtug [![Test](https://github.com/pawi1/pkgtug/actions/workflows/test.yml/badge.svg)](https://github.com/pawi1/pkgtug/actions/workflows/test.yml) [![CodeQL](https://github.com/pawi1/pkgtug/actions/workflows/codeql.yml/badge.svg)](https://github.com/pawi1/pkgtug/actions/workflows/codeql.yml) [![Go](https://img.shields.io/github/go-mod/go-version/pawi1/pkgtug)](go.mod) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A self-hosted, generic package manager and auto-updater for binary releases.
 
