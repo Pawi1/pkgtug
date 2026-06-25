@@ -88,11 +88,11 @@ func (a *App) installGH(ownerRepo, componentHint string, autoUpdate bool) error 
 	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
 		return fmt.Errorf("create dir: %w", err)
 	}
+	if err := os.Chmod(tmpFile, 0o755); err != nil {
+		return fmt.Errorf("set permissions: %w", err)
+	}
 	if err := os.Rename(tmpFile, binaryPath); err != nil {
 		return fmt.Errorf("install binary: %w", err)
-	}
-	if err := os.Chmod(binaryPath, 0o755); err != nil {
-		return err
 	}
 
 	installedSHA, _ := client.SHA256File(binaryPath)
@@ -168,7 +168,7 @@ func verifyGHChecksumLocal(tmpFile, assetName, checksumURL string) error {
 	content := string(data)
 	for _, line := range strings.Split(content, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) >= 2 && fields[1] == assetName {
+		if len(fields) >= 2 && (fields[1] == assetName || fields[1] == "*"+assetName) {
 			return client.VerifySHA256File(tmpFile, fields[0])
 		}
 	}
@@ -176,7 +176,7 @@ func verifyGHChecksumLocal(tmpFile, assetName, checksumURL string) error {
 	if len(trimmed) == 64 {
 		return client.VerifySHA256File(tmpFile, trimmed)
 	}
-	return nil
+	return fmt.Errorf("no checksum found for %q in checksum file", assetName)
 }
 
 func formatBytes(n int64) string {

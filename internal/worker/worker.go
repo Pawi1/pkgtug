@@ -97,7 +97,10 @@ func RunOnce(ctx context.Context, cfg Config, waitFor time.Duration) error {
 // pollOnce does a single GET /tug/build/next. Returns (jobFound, error).
 func pollOnce(ctx context.Context, client *http.Client, cfg Config) (bool, error) {
 	url := cfg.ServerURL + "/tug/build/next?platform=" + cfg.Platform
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, fmt.Errorf("build request: %w", err)
+	}
 	req.Header.Set("Authorization", "Bearer "+cfg.Secret)
 
 	resp, err := client.Do(req)
@@ -199,6 +202,9 @@ func postSuccess(ctx context.Context, client *http.Client, cfg Config, j *job, c
 
 	for _, bin := range j.Binaries {
 		binPath := filepath.Join(cloneDir, bin.Path)
+		if !strings.HasPrefix(binPath, cloneDir+string(filepath.Separator)) {
+			return postError(ctx, client, cfg, j, fmt.Sprintf("binary path %q escapes clone directory", bin.Path))
+		}
 		f, err := os.Open(binPath)
 		if err != nil {
 			return postError(ctx, client, cfg, j, fmt.Sprintf("open binary %s: %v", bin.Component, err))
@@ -247,7 +253,10 @@ func postError(ctx context.Context, client *http.Client, cfg Config, j *job, err
 
 func postResult(ctx context.Context, client *http.Client, cfg Config, jobID, contentType string, body io.Reader) error {
 	url := cfg.ServerURL + "/tug/build/" + jobID + "/result"
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
 	req.Header.Set("Authorization", "Bearer "+cfg.Secret)
 	req.Header.Set("Content-Type", contentType)
 

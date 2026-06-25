@@ -175,6 +175,10 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed, 
 		manifestSHA = storedSum
 	}
 
+	mu := s.manifestLock(pkgName)
+	mu.Lock()
+	defer mu.Unlock()
+
 	mfPath := filepath.Join(s.cfg.Server.DataDir, "packages", pkgName, "manifest.json")
 	mf, err := manifest.Load(mfPath)
 	if err != nil {
@@ -273,10 +277,11 @@ func saveFile(src io.Reader, dst string) (string, int64, error) {
 	if err != nil {
 		return "", 0, err
 	}
-	defer f.Close()
 	h := sha256.New()
 	n, err := io.Copy(io.MultiWriter(f, h), src)
+	f.Close()
 	if err != nil {
+		os.Remove(dst)
 		return "", 0, err
 	}
 	return hex.EncodeToString(h.Sum(nil)), n, nil

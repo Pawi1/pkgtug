@@ -16,6 +16,7 @@ type Server struct {
 	jobs        *jobRegistry
 	tg          *notify.Telegram
 	fetchMu     sync.Map // per-package mutex to serialize concurrent fetches
+	manifestMu  sync.Map // per-package mutex to serialize manifest reads/writes
 	webhookLast sync.Map // per-package last webhook time (time.Time)
 }
 
@@ -84,5 +85,10 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) packageMu(name string) *sync.Mutex {
 	v, _ := s.fetchMu.LoadOrStore(name, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
+
+func (s *Server) manifestLock(name string) *sync.Mutex {
+	v, _ := s.manifestMu.LoadOrStore(name, &sync.Mutex{})
 	return v.(*sync.Mutex)
 }

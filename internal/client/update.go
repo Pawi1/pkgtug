@@ -108,6 +108,15 @@ func Update(serverURL, token string, state State, key, platform string, p Progre
 		return false, fmt.Errorf("sha256 mismatch: %w", verifyErr)
 	}
 
+	// Check for local edits before stopping the service.
+	if entry.InstalledSHA256 != "" {
+		if abort, err := handleConflict(p, key, entry, tmpFile, bin.SHA256); err != nil {
+			return false, err
+		} else if abort {
+			return false, nil
+		}
+	}
+
 	backupPath := ""
 	if entry.BackupDir != "" {
 		backupPath, err = backupBinary(entry.BinaryPath, entry.BackupDir, component)
@@ -121,15 +130,6 @@ func Update(serverURL, token string, state State, key, platform string, p Progre
 		p.Log("%s: stopping service %s", key, entry.ServiceName)
 		if err := StopService(entry.ServiceName); err != nil {
 			return false, fmt.Errorf("stop service: %w", err)
-		}
-	}
-
-	// Check for local edits before replacing user-editable files.
-	if entry.InstalledSHA256 != "" {
-		if abort, err := handleConflict(p, key, entry, tmpFile, bin.SHA256); err != nil {
-			return false, err
-		} else if abort {
-			return false, nil
 		}
 	}
 
@@ -424,10 +424,13 @@ func sha256File(path string) (string, error) {
 
 func runDiff(current, next string) string {
 	out, err := exec.Command("diff", "-u", "--label", "current", "--label", "new", current, next).CombinedOutput()
-	if err == nil || len(out) > 0 {
+	if err == nil {
 		return string(out)
 	}
-	return ""
+	if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+		return string(out) // exit 1 means files differ — expected
+	}
+	return "" // exit 2 or other error: diff itself failed
 }
 
 func copyFile(src, dst string) error {
@@ -554,7 +557,10 @@ func UpdateGH(state State, key, platform string, p Progress, pickFn func([]GHAss
 		}
 	}
 
-	currentSHA, _ := sha256File(entry.BinaryPath)
+	currentSHA, err := sha256File(entry.BinaryPath)
+	if err != nil {
+		return false, fmt.Errorf("hash installed binary: %w", err)
+	}
 	entry.InstalledVersion = rel.TagName
 	entry.InstalledSHA256 = currentSHA
 	entry.UpdatedAt = time.Now().UTC()
@@ -573,10 +579,10 @@ func verifyGHChecksum(tmpFile, assetName, checksumURL string) error {
 		return err
 	}
 	content := string(data)
-	// Format: "<sha256>  <filename>" (one entry per line)
+	// Format: "<sha256>  <filename>" or "<sha256> *<filename>" (binary mode)
 	for _, line := range strings.Split(content, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) >= 2 && fields[1] == assetName {
+		if len(fields) >= 2 && (fields[1] == assetName || fields[1] == "*"+assetName) {
 			return verifySHA256(tmpFile, fields[0])
 		}
 	}
@@ -585,7 +591,7 @@ func verifyGHChecksum(tmpFile, assetName, checksumURL string) error {
 	if len(trimmed) == 64 { // SHA256 hex
 		return verifySHA256(tmpFile, trimmed)
 	}
-	return nil // checksum file format unrecognised — skip
+	return fmt.Errorf("no checksum found for %q in checksum file", assetName)
 }
 
 func SplitKey(key string) (pkg, component string, err error) {
