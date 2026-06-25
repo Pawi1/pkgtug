@@ -103,11 +103,6 @@ func (a *App) installOneComponent(pkgName, component, remoteName, serverURL stri
 
 	defaultPath := filepath.Join(pathBinDir(), component)
 	binaryPath := prompt("Binary path", defaultPath)
-	postInstall := promptPostInstall(binaryPath)
-	serviceName := promptServiceName()
-	healthCheck := promptOptional("Health check URL or command")
-	backupDir := promptOptional("Backup directory (for rollback)")
-	deps := promptDependencies(a)
 
 	if err := ensureSystemDeps(component, bin.SystemDeps); err != nil {
 		return err
@@ -185,17 +180,12 @@ func (a *App) installOneComponent(pkgName, component, remoteName, serverURL stri
 
 	installedSHA, _ := client.SHA256File(binaryPath)
 	a.state[key] = &client.InstallEntry{
-		Remote:           remoteName,
+		Remote:          remoteName,
 		InstalledVersion: mf.Version,
-		UpdatedAt:        time.Now().UTC(),
-		BinaryPath:       binaryPath,
-		PostInstall:      postInstall,
-		ServiceName:      serviceName,
-		HealthCheck:      healthCheck,
-		BackupDir:        backupDir,
-		AutoUpdate:       autoUpdate,
-		DependsOn:        deps,
-		InstalledSHA256:  installedSHA,
+		UpdatedAt:       time.Now().UTC(),
+		BinaryPath:      binaryPath,
+		AutoUpdate:      autoUpdate,
+		InstalledSHA256: installedSHA,
 	}
 	if err := a.saveState(); err != nil {
 		return fmt.Errorf("save state: %w", err)
@@ -206,17 +196,8 @@ func (a *App) installOneComponent(pkgName, component, remoteName, serverURL stri
 	} else {
 		fmt.Printf("\n✓ %s installed to %s\n", key, binaryPath)
 	}
-	fmt.Printf("  remote:   %s\n", remoteName)
-	fmt.Printf("  version:  %s\n", mf.Version)
-	if serviceName != "" {
-		fmt.Printf("  service:  %s\n", serviceName)
-	}
-	if healthCheck != "" {
-		fmt.Printf("  health:   %s\n", healthCheck)
-	}
-	if backupDir != "" {
-		fmt.Printf("  backup:   %s\n", backupDir)
-	}
+	fmt.Printf("  remote:  %s\n", remoteName)
+	fmt.Printf("  version: %s\n", mf.Version)
 	return nil
 }
 
@@ -316,87 +297,6 @@ func isDirWritable(dir string) (bool, error) {
 	tmp.Close()
 	os.Remove(tmp.Name())
 	return true, nil
-}
-
-// promptPostInstall suggests a post-install command based on the install path and
-// lets the user accept, edit in $EDITOR, or skip.
-func promptPostInstall(binaryPath string) string {
-	suggestion := suggestPostInstall(binaryPath)
-
-	if suggestion == "" {
-		fmt.Print("Post-install command (runs after each update, Enter to skip): ")
-		line, _ := stdinReader.ReadString('\n')
-		return strings.TrimSpace(line)
-	}
-
-	fmt.Printf("Post-install command [%s]: ", suggestion)
-	fmt.Println()
-	fmt.Println("  1) accept suggestion")
-	fmt.Println("  e) edit in $EDITOR")
-	fmt.Println("  0) skip")
-
-	for {
-		raw := strings.TrimSpace(prompt("Select", "1"))
-		switch raw {
-		case "1", "":
-			return suggestion
-		case "0":
-			return ""
-		case "e", "E":
-			val, err := editInEditor(suggestion)
-			if err != nil {
-				fmt.Printf("  editor error: %v\n", err)
-				continue
-			}
-			return val
-		default:
-			fmt.Println("  enter 0, 1, or e")
-		}
-	}
-}
-
-// suggestPostInstall returns a sensible post-install command based on the target path.
-func suggestPostInstall(path string) string {
-	switch {
-	case strings.HasPrefix(path, "/etc/systemd/") && strings.HasSuffix(path, ".service"):
-		base := filepath.Base(path)
-		unit := strings.TrimSuffix(base, ".service")
-		return "systemctl daemon-reload && systemctl enable " + unit
-	case strings.HasPrefix(path, "/etc/systemd/"):
-		return "systemctl daemon-reload"
-	case strings.HasPrefix(path, "/etc/init.d/"):
-		base := filepath.Base(path)
-		return "rc-update add " + base + " default"
-	case strings.HasPrefix(path, "/etc/conf.d/") || strings.HasPrefix(path, "/etc/rc.d/"):
-		return ""
-	default:
-		return ""
-	}
-}
-
-// promptServiceName asks for a service name, offering a picker if services are detectable.
-func promptServiceName() string {
-	services := client.ListServices()
-	if len(services) == 0 {
-		return promptOptional("Service name (for stop/start during update)")
-	}
-	name, chosen := pickFromListOptional("Service to stop/start during update:", services)
-	if !chosen {
-		return promptOptional("Service name (or Enter to skip)")
-	}
-	return name
-}
-
-// promptDependencies asks which already-installed packages this package depends on.
-func promptDependencies(a *App) []string {
-	var keys []string
-	for k := range a.state {
-		keys = append(keys, k)
-	}
-	if len(keys) == 0 {
-		return nil
-	}
-	return pickMultiFromList("Dependencies (other installed packages that must update first):", keys)
 }
 
 // parseInstallArg parses "[<remote>:]<package>[/<component>]".

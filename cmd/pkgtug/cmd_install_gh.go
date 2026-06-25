@@ -65,11 +65,6 @@ func (a *App) installGH(ownerRepo, componentHint string, autoUpdate bool) error 
 
 	defaultPath := filepath.Join("/opt", key)
 	binaryPath := prompt("Binary path", defaultPath)
-	postInstall := promptPostInstall(binaryPath)
-	serviceName := promptServiceName()
-	healthCheck := promptOptional("Health check URL or command")
-	backupDir := promptOptional("Backup directory (for rollback)")
-	deps := promptDependencies(a)
 
 	fmt.Println()
 	p.StartSpinner("downloading " + asset.Name)
@@ -102,18 +97,13 @@ func (a *App) installGH(ownerRepo, componentHint string, autoUpdate bool) error 
 
 	installedSHA, _ := client.SHA256File(binaryPath)
 	a.state[key] = &client.InstallEntry{
-		Remote:           "github:" + ownerRepo,
-		GHSource:         ownerRepo,
+		Remote:          "github:" + ownerRepo,
+		GHSource:        ownerRepo,
 		InstalledVersion: rel.TagName,
-		UpdatedAt:        time.Now().UTC(),
-		BinaryPath:       binaryPath,
-		PostInstall:      postInstall,
-		ServiceName:      serviceName,
-		HealthCheck:      healthCheck,
-		BackupDir:        backupDir,
-		AutoUpdate:       autoUpdate,
-		DependsOn:        deps,
-		InstalledSHA256:  installedSHA,
+		UpdatedAt:       time.Now().UTC(),
+		BinaryPath:      binaryPath,
+		AutoUpdate:      autoUpdate,
+		InstalledSHA256: installedSHA,
 	}
 	if err := a.saveState(); err != nil {
 		return fmt.Errorf("save state: %w", err)
