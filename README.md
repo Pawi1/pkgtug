@@ -379,6 +379,17 @@ In non-interactive mode (cron, daemon): automatically keeps the current file, sa
 
 No daemon required. When stdout is not a terminal (cron, CI), all TUI output is replaced with plain log lines and conflicts are auto-resolved non-destructively.
 
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Server reference](docs/wiki/server.md)
+- [Worker reference](docs/wiki/worker.md)
+- [Client reference](docs/wiki/client.md)
+- [Deployment guide](docs/wiki/deployment.md)
+- [Configuration reference](docs/wiki/configuration.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+
 ## Building
 
 ```sh
