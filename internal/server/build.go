@@ -195,7 +195,16 @@ func (s *Server) storeBinary(pkgName, version, platform, component, compressed, 
 	}
 	url := fmt.Sprintf("%s/tug/repo/%s/binaries/%s/%s/%s",
 		s.cfg.Server.BaseURL, pkgName, version, platform, component)
-	mf.Binaries[component][platform] = manifest.Binary{URL: url, SHA256: manifestSHA, Size: size, Compressed: compressed}
+	entry := manifest.Binary{URL: url, SHA256: manifestSHA, Size: size, Compressed: compressed}
+	if pkg, ok := s.packages[pkgName]; ok {
+		for _, b := range pkg.Binaries {
+			if b.Component == component {
+				entry.InstallDeps = b.InstallDeps
+				break
+			}
+		}
+	}
+	mf.Binaries[component][platform] = entry
 
 	if err := manifest.WriteAtomic(mfPath, mf); err != nil {
 		return err

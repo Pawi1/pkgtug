@@ -61,8 +61,9 @@ type VersionSource struct {
 }
 
 type Binary struct {
-	Component string `yaml:"component"`
-	Path      string `yaml:"path"`
+	Component   string   `yaml:"component"`
+	Path        string   `yaml:"path"`
+	InstallDeps []string `yaml:"install_deps,omitempty"` // other components of this package to install first
 }
 
 func LoadServer(path string) (*ServerConfig, error) {

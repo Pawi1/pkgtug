@@ -64,21 +64,27 @@ func (a *App) cmdInstall(args []string) error {
 	}
 
 	if component == "" {
-		components := make([]string, 0, len(mf.Binaries))
-		for c := range mf.Binaries {
-			components = append(components, c)
+		ordered, err := topoSortComponents(mf)
+		if err != nil {
+			return err
 		}
-		if len(components) == 1 {
-			component = components[0]
+		if len(ordered) == 1 {
+			component = ordered[0]
 		} else {
-			idx, err := pickFromList("Available components:", components)
-			if err != nil {
-				return err
+			// Install all components in dependency order.
+			for _, c := range ordered {
+				if err := a.installOneComponent(pkgName, c, remoteName, serverURL, mf, *autoUpdate); err != nil {
+					return err
+				}
 			}
-			component = components[idx]
+			return nil
 		}
 	}
 
+	return a.installOneComponent(pkgName, component, remoteName, serverURL, mf, *autoUpdate)
+}
+
+func (a *App) installOneComponent(pkgName, component, remoteName, serverURL string, mf *client.Manifest, autoUpdate bool) error {
 	bins, ok := mf.Binaries[component]
 	if !ok {
 		return fmt.Errorf("component %q not found in manifest for %s", component, pkgName)
@@ -180,7 +186,7 @@ func (a *App) cmdInstall(args []string) error {
 		ServiceName:      serviceName,
 		HealthCheck:      healthCheck,
 		BackupDir:        backupDir,
-		AutoUpdate:       *autoUpdate,
+		AutoUpdate:       autoUpdate,
 		DependsOn:        deps,
 		InstalledSHA256:  installedSHA,
 	}
@@ -188,7 +194,7 @@ func (a *App) cmdInstall(args []string) error {
 		return fmt.Errorf("save state: %w", err)
 	}
 
-	if *autoUpdate {
+	if autoUpdate {
 		fmt.Printf("\n✓ %s installed to %s (autoupdate enabled)\n", key, binaryPath)
 	} else {
 		fmt.Printf("\n✓ %s installed to %s\n", key, binaryPath)
@@ -205,6 +211,40 @@ func (a *App) cmdInstall(args []string) error {
 		fmt.Printf("  backup:   %s\n", backupDir)
 	}
 	return nil
+}
+
+// topoSortComponents returns components in dependency order (deps before dependents).
+// Components with no install_deps come first; cycles are ignored (affected component
+// is placed at the end).
+func topoSortComponents(mf *client.Manifest) ([]string, error) {
+	deps := make(map[string][]string, len(mf.Binaries))
+	for comp, platforms := range mf.Binaries {
+		// use deps from any platform entry (they're the same)
+		for _, bin := range platforms {
+			deps[comp] = bin.InstallDeps
+			break
+		}
+	}
+
+	var order []string
+	visited := make(map[string]bool)
+	var visit func(c string)
+	visit = func(c string) {
+		if visited[c] {
+			return
+		}
+		visited[c] = true
+		for _, dep := range deps[c] {
+			if _, ok := mf.Binaries[dep]; ok {
+				visit(dep)
+			}
+		}
+		order = append(order, c)
+	}
+	for c := range mf.Binaries {
+		visit(c)
+	}
+	return order, nil
 }
 
 // pathBinDir returns the first directory from $PATH that exists and is writable,
