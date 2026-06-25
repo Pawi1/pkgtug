@@ -22,11 +22,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
       - name: Run tests
-        run: go test -json ./... 2>&1 | tee results.json; exit ${PIPESTATUS[0]}
+        run: gotestsum --junitfile results.xml
       - uses: dorny/test-reporter@v1
         if: always()
         with:
           name: Go Tests
-          path: results.json
-          reporter: go-test-json
+          path: results.xml
+          reporter: java-junit
