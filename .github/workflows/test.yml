@@ -14,9 +14,19 @@ jobs:
     name: go test
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      checks: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go test ./...
+      - name: Run tests
+        run: go test -json ./... 2>&1 | tee results.json; exit ${PIPESTATUS[0]}
+      - uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Go Tests
+          path: results.json
+          reporter: go-test-json
