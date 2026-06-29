@@ -1203,8 +1203,7 @@ async function triggerFetch(name, btn) {
   btn.disabled = true;
   btn.textContent = '…';
   try {
-    const r = await fetch(serverURL + '/tug/fetch/' + encodeURIComponent(name), { method: 'POST' });
-    if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+    await fetch(serverURL + '/tug/fetch/' + encodeURIComponent(name), { method: 'POST', mode: 'no-cors' });
     btn.textContent = '✓';
     setStatus('success', 'Fetch triggered for ' + esc(name));
   } catch (e) {
