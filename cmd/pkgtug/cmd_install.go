@@ -150,8 +150,9 @@ func (a *App) installOneComponent(pkgName, component, remoteName, serverURL stri
 	if algo != compress.None {
 		size = -1
 	}
+	var ui *tui.UI
 	if tui.IsTerminal() {
-		ui := tui.New()
+		ui = tui.New()
 		if pw := ui.DownloadWriter(component, size); pw != nil {
 			dst = io.MultiWriter(tmp, pw)
 		}
@@ -161,7 +162,11 @@ func (a *App) installOneComponent(pkgName, component, remoteName, serverURL stri
 		return fmt.Errorf("download write: %w", err)
 	}
 	tmp.Close()
-	fmt.Println()
+	if ui != nil {
+		ui.FinishDownload()
+	} else {
+		fmt.Println()
+	}
 
 	if bin.SHA256 != "" {
 		fmt.Print("Verifying SHA256... ")
