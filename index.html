@@ -741,10 +741,15 @@ function buildCard(pkg) {
   const badge = el('span', 'version-badge' + (pkg.version ? '' : ' none'));
   badge.textContent = pkg.version || 'no build yet';
 
+  const fetchBtn = el('button', 'copy-btn');
+  fetchBtn.title = 'Trigger git fetch';
+  fetchBtn.textContent = '↻';
+  fetchBtn.onclick = e => { e.stopPropagation(); triggerFetch(pkg.name, fetchBtn); };
+
   const chev = el('span', 'chevron');
   chev.textContent = '▶';
 
-  header.append(name, badge, chev);
+  header.append(name, badge, fetchBtn, chev);
   card.appendChild(header);
 
   const body = el('div', 'pkg-body');
@@ -1190,6 +1195,23 @@ async function searchGHReleases() {
     }
     card.appendChild(body);
     resultsEl.appendChild(card);
+  }
+}
+
+async function triggerFetch(name, btn) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await fetch(serverURL + '/tug/fetch/' + encodeURIComponent(name), { method: 'POST' });
+    if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+    btn.textContent = '✓';
+    setStatus('success', 'Fetch triggered for ' + esc(name));
+  } catch (e) {
+    setStatus('error', 'Fetch failed for ' + esc(name) + ': ' + esc(e.message));
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = orig; }, 2000);
   }
 }
 
