@@ -14,7 +14,7 @@ func Fetch(localClone, versionType, branchName string) error {
 	var args []string
 	switch versionType {
 	case "tag":
-		args = []string{"fetch", "--tags", "--prune", "--prune-tags"}
+		args = []string{"fetch", "--tags", "--prune", "--prune-tags", "--force"}
 	case "branch":
 		args = []string{"fetch", "origin", branchName}
 	default:
@@ -56,7 +56,7 @@ func EnsureClone(gitURL, localDir string) error {
 		}
 		return run("", "clone", "--filter=blob:none", gitURL, localDir)
 	}
-	return run(localDir, "fetch", "--all", "--tags", "--prune", "--prune-tags")
+	return run(localDir, "fetch", "--all", "--tags", "--prune", "--prune-tags", "--force")
 }
 
 // Checkout checks out the given ref (tag, branch, or SHA) with a clean working tree.
